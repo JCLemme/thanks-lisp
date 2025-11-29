@@ -10,6 +10,11 @@
 #define TAG_MAGIC (0xEAULL << 56)
 #define TAG_MAGIC_MASK (0xFFULL << 56)
 
+#define IS_NIL(cell) (cell->car == NULL && cell->cdr == NULL)
+#define NIL (&nil_cell)
+#define IS_T(cell) (!IS_NIL(cell))
+#define T (&true_cell)
+
 #define TAG_TYPE_MASK       (0xFF)
 #define OF_TYPE(tag, type) ((tag & ~TAG_TYPE_MASK) | type)
 #define IS_TYPE(tag, type) ((tag & TAG_TYPE_MASK) == type)
@@ -23,10 +28,25 @@
 #define TAG_TYPE_STRING     (0x06)
 #define TAG_TYPE_ARRAY      (0x07)
 #define TAG_TYPE_BUILTIN    (0x08)
+#define TAG_TYPE_EXCEPTION  (0x09)
+
+#define TAG_SPEC_MASK       (0xFF << 8)
+#define OF_SPEC(tag, spec)  ((tag & ~TAG_SPEC_MASK) | spec)
+#define IS_SPEC(tag, spec)  ((tag & TAG_SPEC_MASK) == spec)
+
+#define TAG_SPEC_FUNLAZY    (0x01 << 8)
+#define TAG_SPEC_FUNMACRO   (0x02 << 8)
+
+#define TAG_SPEC_EX_LABEL   (0x01 << 8) // tryin some shit
+#define TAG_SPEC_EX_EXIT    (0x02 << 8)
+#define TAG_SPEC_EX_TYPE    (0x03 << 8)
+#define TAG_SPEC_EX_VALUE   (0x04 << 8)
+#define TAG_SPEC_EX_DATA    (0x05 << 8)
 
 #define TAG_LAZY            (0x100)
-#define TAG_MARKED          (0x200)
+#define TAG_MARKED          (0x10000)
 
+// Unsure if exceptions should be their own type.
 
 typedef struct Cell
 {
@@ -49,10 +69,14 @@ typedef struct Cell
 } Cell;
 
 extern Cell* sym_top;
+extern Cell nil_cell;
+extern Cell true_cell;
 
 void memory_init(int cells);
 
 int memory_get_used();
+
+Cell* memory_nth(Cell* begin, int place);
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr);
 
@@ -65,8 +89,13 @@ Cell* memory_alloc_string(char* src);
 void memory_build_symbol(Cell* found, char* src);
 Cell* memory_alloc_symbol(char* src);
 
-Cell* memory_alloc_lambda(Cell* args, Cell* body, bool lazy);
-Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), bool lazy);
+void memory_build_lambda(Cell* found, Cell* args, Cell* body, int tags);
+Cell* memory_alloc_lambda(Cell* args, Cell* body, int tags);
+void memory_build_builtin(Cell* found, Cell* (*primfunc)(Cell*), int tags);
+Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), int tags);
+
+void memory_build_exception(Cell* found, int kind, Cell* data);
+Cell* memory_alloc_exception(int kind, Cell* data);
 
 int memory_mark(Cell* begin);
 int memory_sweep();

@@ -6,6 +6,8 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 
 * Working lambdas
 * Garbage collection
+* Tagbodies
+* Lexical scoping
 * Preliminary support for macros
 * Usually doesn't segfault
 

@@ -14,6 +14,10 @@ static Cell* free_top = NULL;
 static int free_used = 0;
 static int free_avail = 0;
 
+// A simple optimization. We throw these around as return values, so keep them allocated off the heap.
+Cell nil_cell;
+Cell true_cell;
+
 // TODO: i think I can save a mark() pass if symbols refer to the cons cell in this list
 // or not since that would make holes...
 Cell* sym_top = NULL;
@@ -37,9 +41,22 @@ void memory_init(int cells)
 
     // End of the line.
     mem[num_cells-1].cdr = NULL;
+
+    // Preallocate cells for true and false.
+    nil_cell.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    nil_cell.car = NULL;
+    nil_cell.cdr = NULL;
+
+    memory_build_symbol(&true_cell, "t");
 }
 
 int memory_get_used() { return free_used; }
+
+Cell* memory_nth(Cell* begin, int place) 
+{
+    if(begin == NULL || place <= 0) return begin;
+    return memory_nth(begin->cdr, place - 1);
+}
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr)
 {
@@ -171,42 +188,57 @@ Cell* memory_alloc_symbol(char* src)
 }
 
 
-void memory_build_lambda(Cell* found, Cell* args, Cell* body, bool lazy)
+void memory_build_lambda(Cell* found, Cell* args, Cell* body, int tags)
 {
     found->tag = OF_TYPE(found->tag, TAG_TYPE_LAMBDA);
-    if(lazy) found->tag |= TAG_LAZY;
+    found->tag |= tags;
 
-    D(printf("memory: built new lambda in cell %08x%s\n", found, lazy ? " (lazy)" : ""));
+    D(printf("memory: built new lambda in cell %08x%s%s\n", found, tags & TAG_SPEC_FUNLAZY ? " (lazy)" : "", tags & TAG_SPEC_FUNMACRO ? " (macro)" : ""));
 
     found->car = args;
     found->cdr = body;
 }
 
-Cell* memory_alloc_lambda(Cell* args, Cell* body, bool lazy)
+Cell* memory_alloc_lambda(Cell* args, Cell* body, int tags)
 {
     Cell* found = memory_alloc_cons(NULL, NULL);
-    memory_build_lambda(found, args, body, lazy);
+    memory_build_lambda(found, args, body, tags);
     return found;
 }
 
-Cell* memory_build_builtin(Cell* found, Cell* (*primfunc)(Cell*), bool lazy)
+void memory_build_builtin(Cell* found, Cell* (*primfunc)(Cell*), int tags)
 {
     found->tag = OF_TYPE(found->tag, TAG_TYPE_BUILTIN);
-    if(lazy) found->tag |= TAG_LAZY;
+    found->tag |= tags;
 
-    D(printf("memory: built new builtin in cell %08x%s\n", found, lazy ? " (lazy)" : ""));
+    D(printf("memory: built new builtin in cell %08x%s%s\n", found, tags & TAG_SPEC_FUNLAZY ? " (lazy)" : "", tags & TAG_SPEC_FUNMACRO ? " (macro)" : ""));
 
     found->car = primfunc;
-    return found;
 }
 
-Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), bool lazy)
+Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), int tags)
 {
     Cell* found = memory_alloc_cons(NULL, NULL);
-    memory_build_builtin(found, primfunc, lazy);
+    memory_build_builtin(found, primfunc, tags);
     return found;
 }
 
+void memory_build_exception(Cell* found, int kind, Cell* data)
+{
+    // TODO: replace with enumtype?
+    found->tag = OF_TYPE(found->tag, TAG_TYPE_EXCEPTION);
+    found->tag = OF_SPEC(found->tag, kind);
+    found->car = data;
+}
+
+Cell* memory_alloc_exception(int kind, Cell* data)
+{
+    Cell* found = memory_alloc_cons(NULL, NULL);
+    memory_build_exception(found, kind, data);
+    return found;
+}
+
+// --- 
 
 int memory_mark(Cell* begin)
 {
