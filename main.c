@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,7 @@
 #include "memory.h"
 #include "util.h"
 
-Cell* _evaluate_sexp(Cell* target, bool run_macro);
+Cell* _evaluate_sexp(Cell* target);
 
 // Holds mappings that we kept with define and w/e.
 Cell* frame_top = NULL;
@@ -33,9 +34,11 @@ Cell* frame_define_name(char* name, Cell* val)
 }
 
 // Find the most recent definition for a symbol.
-Cell* frame_find(Cell* sym, Cell* namespace)
+Cell* frame_find(Cell* sym, Cell* namespace, int depth)
 {
     // Apologies for long function; not enough time to write shorter one
+    int found = 0;
+
     if(namespace == NULL)
     {
         // Walk the list.
@@ -50,6 +53,9 @@ Cell* frame_find(Cell* sym, Cell* namespace)
             {
                 return found_def;
             }
+            
+            found++;
+            if(depth >= 0 && found >= depth) { return NULL; }
             frame_current = frame_current->cdr;
         }
     }
@@ -105,12 +111,12 @@ Cell* frame_find_name(char* name)
     // Build a symbol locally.
     Cell sym;
     memory_build_symbol(&sym, name);
-    return frame_find(&sym, NULL);
+    return frame_find(&sym, NULL, -1);
 }
 
 Cell* frame_set(Cell* sym, Cell* val)
 {
-    Cell* def = frame_find(sym, NULL);
+    Cell* def = frame_find(sym, NULL, -1);
     if(IS_TYPE(def->tag, TAG_TYPE_EXCEPTION))
     {
         return def;
@@ -136,7 +142,7 @@ void frame_pop(int count)
 
 Cell* fn_def(Cell* args)
 {
-    Cell* evalarg = _evaluate_sexp(((Cell*)(args->cdr))->car, true);
+    Cell* evalarg = _evaluate_sexp(((Cell*)(args->cdr))->car);
     frame_define(args->car, evalarg);
     return args->car;
 }
@@ -207,8 +213,6 @@ Cell* fn_sub(Cell* args)
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("sub: not a number"));
-            //printf("fn: add: not a number\n");
-            //abort();
         }
         if(first)
         {
@@ -235,8 +239,6 @@ Cell* fn_mul(Cell* args)
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("mul: not a number"));
-            //printf("fn: add: not a number\n");
-            //abort();
         }
         acc *= arg->num;
         args = args->cdr;
@@ -255,8 +257,6 @@ Cell* fn_div(Cell* args)
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("div: not a number"));
-            //printf("fn: add: not a number\n");
-            //abort();
         }
         if(first)
         {
@@ -513,14 +513,47 @@ Cell* fn_print(Cell* args)
     return arg;
 }
 
-Cell* _evaluate_sexp(Cell* target, bool run_macro)
+Cell* _seek_and_destroy(Cell* body, int depth)
+{
+    if(!IS_TYPE(body->tag, TAG_TYPE_CONS))
+    {
+        if(IS_TYPE(body->tag, TAG_TYPE_SYMBOL))
+        {
+            // Look it up first
+            Cell* found = frame_find(body, NULL, depth);
+            if(found == NULL)
+                return body;
+            else
+                return found->cdr;
+        }
+        else
+        {
+            // It's an atom - return it
+            return body;
+        }
+    }
+    else
+    {
+        Cell* backup = body;
+
+        while(body != NULL)
+        {
+            body->car = _seek_and_destroy(body->car, depth);
+            body = body->cdr;
+        }
+
+        return backup;
+    }
+}
+
+Cell* _evaluate_sexp(Cell* target)
 {
     if(!IS_TYPE(target->tag, TAG_TYPE_CONS))
     {
         if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
         {
             // Look it up first
-            Cell* found = frame_find(target, NULL)->cdr;
+            Cell* found = frame_find(target, NULL, -1)->cdr; // sus 
             if(found == NULL)
                 return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: function undefined"));
             else
@@ -543,7 +576,7 @@ Cell* _evaluate_sexp(Cell* target, bool run_macro)
         //_print_sexps(func);
         //printf("\n");
 
-        func = _evaluate_sexp(func, true); // Need to eval symbol here so we know what to call
+        func = _evaluate_sexp(func); 
         if(IS_TYPE(func->tag, TAG_TYPE_EXCEPTION)) { return func; }
 
         if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY))
@@ -565,7 +598,7 @@ Cell* _evaluate_sexp(Cell* target, bool run_macro)
                     curr_arg = curr_arg->cdr;
                 }
 
-                curr_arg->car = _evaluate_sexp(args->car, true); // see above
+                curr_arg->car = _evaluate_sexp(args->car); // see above
                 if(IS_TYPE(((Cell*)curr_arg->car)->tag, TAG_TYPE_EXCEPTION)) { return curr_arg->car; }
                 args = args->cdr;
             }
@@ -575,6 +608,7 @@ Cell* _evaluate_sexp(Cell* target, bool run_macro)
         }
         else
         {
+            // Literally just counting.
             Cell* backup_args = args;
             while(backup_args != NULL) 
             {
@@ -602,14 +636,19 @@ Cell* _evaluate_sexp(Cell* target, bool run_macro)
                 todef = todef->cdr;
             }
 
-            Cell* result = _evaluate_sexp(body, true); // hmmm
+            Cell* result = NULL;
+
+            if(IS_SPEC(func->tag, TAG_SPEC_FUNMACRO))
+            {
+                result = _seek_and_destroy(body, expected);
+            }
+            else
+            {
+                result = _evaluate_sexp(body); // hmmm
+            }
+
             if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
             frame_pop(expected);
-
-            if(IS_SPEC(func->tag, TAG_SPEC_FUNMACRO) && run_macro)
-            {
-                result = _evaluate_sexp(result, true);
-            }
 
             return result;
         }
@@ -622,7 +661,7 @@ Cell* _evaluate_sexp(Cell* target, bool run_macro)
 
 Cell* fn_eval(Cell* args)
 {
-    return _evaluate_sexp(args->car, true);
+    return _evaluate_sexp(args->car);
 }
 
 Cell* fn_eq(Cell* args)
@@ -692,12 +731,12 @@ Cell* fn_cond(Cell* args)
         Cell* test = memory_nth(args->car, 0)->car;
         Cell* body = memory_nth(args->car, 1)->car;
 
-        Cell* result = _evaluate_sexp(test, true);
+        Cell* result = _evaluate_sexp(test);
         if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
 
         if(!IS_NIL(result)) 
         { 
-            Cell* returned = _evaluate_sexp(body, true);
+            Cell* returned = _evaluate_sexp(body);
             return returned;
         }
 
@@ -740,7 +779,7 @@ Cell* fn_tagbody(Cell* args)
             }
             else
             {
-                Cell* result = _evaluate_sexp(current_step->car, true);
+                Cell* result = _evaluate_sexp(current_step->car);
                 current_step = current_step->cdr;
 
                 // An exception should be thrown, *unless* it's for us
@@ -798,7 +837,7 @@ Cell* fn_setq(Cell* args)
 
 Cell* fn_macroexpand(Cell* args)
 {
-    return _evaluate_sexp(args->car, false);
+    return _evaluate_sexp(args->car);
 }
 
 int main(int argc, char** argv) 
@@ -872,7 +911,7 @@ int main(int argc, char** argv)
         if(replin[0] != '\0')
         {
             todo = fn_read(NULL);
-            _print_sexps(_evaluate_sexp(todo, true));
+            _print_sexps(_evaluate_sexp(todo));
             printf("\n");
         }
 

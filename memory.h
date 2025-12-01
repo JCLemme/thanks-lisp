@@ -32,7 +32,7 @@
 
 #define TAG_SPEC_MASK       (0xFF << 8)
 #define OF_SPEC(tag, spec)  ((tag & ~TAG_SPEC_MASK) | spec)
-#define IS_SPEC(tag, spec)  ((tag & TAG_SPEC_MASK) == spec)
+#define IS_SPEC(tag, spec)  ((tag & TAG_SPEC_MASK) & spec)
 
 #define TAG_SPEC_FUNLAZY    (0x01 << 8)
 #define TAG_SPEC_FUNMACRO   (0x02 << 8)
@@ -43,7 +43,6 @@
 #define TAG_SPEC_EX_VALUE   (0x04 << 8)
 #define TAG_SPEC_EX_DATA    (0x05 << 8)
 
-#define TAG_LAZY            (0x100)
 #define TAG_MARKED          (0x10000)
 
 // Unsure if exceptions should be their own type.

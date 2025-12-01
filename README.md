@@ -8,7 +8,7 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 * Garbage collection
 * Tagbodies
 * Lexical scoping
-* Preliminary support for macros
+* Macros
 * Usually doesn't segfault
 
 The goal is to see how much I can get done before Thanksgiving, at which point I'll **throw it all away** and start over.
