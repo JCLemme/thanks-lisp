@@ -1,0 +1,12 @@
+Thanks lisp v2
+Now speaking to the lisp listener.
+* 10
+* 5.888889
+* hehe
+* 1
+* dubb
+* 8
+* 1
+* Exception (type 3) in eval: not a function
+* Exception (type 3) in add: not a number
+* * main: used 194/4096 cells
