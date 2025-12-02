@@ -7,6 +7,8 @@
 Cell env_top;
 Cell env_root;
 
+Cell temp_root;
+
 Cell* frame_push_in(Cell* pkg, Cell* def)
 {
     Cell* new_entry = memory_alloc_cons(def, pkg->cdr);
@@ -93,7 +95,40 @@ Cell* frame_free_package(Cell* pkg)
     abort();
 }
 
+// Note: "in" searches only within the bounds of a package
+//       "from" searches the whole env starting from a package
+
 Cell* frame_find_def_in(Cell* pkg, Cell* name)
+{
+    Cell* walker = pkg->cdr;
+    while(walker != NULL && walker != NIL)
+    {
+        Cell* this_def = walker->car;
+
+        if(IS_TYPE(this_def->tag, TAG_TYPE_CONS))
+        {
+            Cell* this_name = this_def->car;
+            if(this_name->car == name->car)
+                return this_def;
+        }
+        else
+        {
+            break;
+        }
+
+        walker = walker->cdr;
+    }
+    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol"));
+}
+
+Cell* frame_find_defn_in(Cell* pkg, char* name)
+{
+    Cell* new_name = memory_alloc_symbol(name);
+    return frame_find_def_in(pkg, new_name);
+}
+
+
+Cell* frame_find_def_from(Cell* pkg, Cell* name)
 {
     Cell* walker = pkg->cdr;
     while(walker != NULL && walker != NIL)
@@ -112,7 +147,7 @@ Cell* frame_find_def_in(Cell* pkg, Cell* name)
     return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol"));
 }
 
-Cell* frame_find_defn_in(Cell* pkg, char* name)
+Cell* frame_find_defn_from(Cell* pkg, char* name)
 {
     Cell* new_name = memory_alloc_symbol(name);
     return frame_find_def_in(pkg, new_name);
@@ -120,13 +155,13 @@ Cell* frame_find_defn_in(Cell* pkg, char* name)
 
 Cell* frame_find_def(Cell* name)
 {
-    return frame_find_def_in(&env_top, name);
+    return frame_find_def_from(&env_top, name);
 }
 
 Cell* frame_find_defn(char* name)
 {
     Cell* new_name = memory_alloc_symbol(name);
-    return frame_find_def_in(&env_top, new_name);
+    return frame_find_def_from(&env_top, new_name);
 }
 
 Cell* frame_find_package(Cell* name)
@@ -175,5 +210,9 @@ Cell* frame_init()
     env_top.car = memory_alloc_symbol("*top*");
     env_top.cdr = &env_root;
     
+    temp_root.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    temp_root.car = memory_alloc_symbol("*temp*");
+    temp_root.cdr = NIL;
+
     return &env_top;
 }

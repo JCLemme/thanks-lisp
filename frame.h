@@ -13,6 +13,8 @@
 extern Cell env_top;
 extern Cell env_root;
 
+extern Cell temp_root;
+
 Cell* frame_push_in(Cell* pkg, Cell* def);
 Cell* frame_push_def(Cell* name, Cell* value);
 Cell* frame_push_defn(char* name, Cell* value);
@@ -31,6 +33,9 @@ Cell* frame_free_package(Cell* pkg);
 
 Cell* frame_find_def_in(Cell* pkg, Cell* name);
 Cell* frame_find_defn_in(Cell* pkg, char* name);
+Cell* frame_find_def_from(Cell* pkg, Cell* name);
+Cell* frame_find_defn_from(Cell* pkg, char* name);
+
 Cell* frame_find_def(Cell* name);
 Cell* frame_find_defn(char* name);
 Cell* frame_find_package(Cell* name);

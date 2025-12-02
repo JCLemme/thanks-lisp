@@ -32,16 +32,16 @@
 
 #define TAG_SPEC_MASK       (0xFF << 8)
 #define OF_SPEC(tag, spec)  ((tag & ~TAG_SPEC_MASK) | spec)
-#define IS_SPEC(tag, spec)  ((tag & TAG_SPEC_MASK) & spec)
+#define IS_SPEC(tag, spec)  (((tag & TAG_SPEC_MASK) & spec) == spec)
 
 #define TAG_SPEC_FUNLAZY    (0x01 << 8)
 #define TAG_SPEC_FUNMACRO   (0x02 << 8)
 
 #define TAG_SPEC_EX_LABEL   (0x01 << 8) // tryin some shit
 #define TAG_SPEC_EX_EXIT    (0x02 << 8)
-#define TAG_SPEC_EX_TYPE    (0x03 << 8)
-#define TAG_SPEC_EX_VALUE   (0x04 << 8)
-#define TAG_SPEC_EX_DATA    (0x05 << 8)
+#define TAG_SPEC_EX_TYPE    (0x03 << 8) // wrong kind of object
+#define TAG_SPEC_EX_VALUE   (0x04 << 8) // ???
+#define TAG_SPEC_EX_DATA    (0x05 << 8) // wasn't found, etc.
 
 #define TAG_MARKED          (0x10000)
 
@@ -96,7 +96,21 @@ Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), int tags);
 void memory_build_exception(Cell* found, int kind, Cell* data);
 Cell* memory_alloc_exception(int kind, Cell* data);
 
+// ---
+
+bool symbol_eql(Cell* one, Cell* two);
+bool string_eql(Cell* one, Cell* two);
+
+// ---
+
+void memory_free(Cell* target);
+
 int memory_mark(Cell* begin);
 int memory_sweep();
+
+void memory_add_root(Cell* nroot);
+void memory_del_root(Cell* nroot);
+int memory_gc();
+int memory_gc_thresh(double pct);
 
 #endif

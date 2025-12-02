@@ -5,147 +5,32 @@
 #include <ctype.h>
 
 #include "memory.h"
+#include "frame.h"
 #include "util.h"
+
+#ifdef DEBUG
+#  define D(x) x
+#else
+#  define D(x)
+#endif
 
 Cell* _evaluate_sexp(Cell* target);
 
-// Holds mappings that we kept with define and w/e.
-Cell* frame_top = NULL;
-Cell* main_frame = NULL;
-
-// TODO: the frame list: a list of frames to check. Functions add/remove lists to the top of the frame list as scope changes, and 
-// new definitions go in the global environment (or a namespace)
-
-// The actual work involved to make a definition.
-Cell* frame_define(Cell* sym, Cell* val)
-{
-    // A definition is a list: first item is a symbol, second is *something*.
-    Cell* new_def = memory_alloc_cons(sym, val);
-    Cell* new_entry = memory_alloc_cons(new_def, frame_top);
-    frame_top = new_entry;
-    return frame_top;
-}
-
-Cell* frame_define_name(char* name, Cell* val)
-{
-    // A definition is a list: first item is a symbol, second is *something*.
-    Cell* sym = memory_alloc_symbol(name);
-    return frame_define(sym, val);
-}
-
-// Find the most recent definition for a symbol.
-Cell* frame_find(Cell* sym, Cell* namespace, int depth)
-{
-    // Apologies for long function; not enough time to write shorter one
-    int found = 0;
-
-    if(namespace == NULL)
-    {
-        // Walk the list.
-        Cell* frame_current = frame_top;
-
-        while(frame_current != NULL)
-        {
-            // Somewhat convoluted
-            Cell* found_def = frame_current->car;
-            Cell* found_sym = found_def->car;
-            if(found_sym->car == sym->car)
-            {
-                return found_def;
-            }
-            
-            found++;
-            if(depth >= 0 && found >= depth) { return NULL; }
-            frame_current = frame_current->cdr;
-        }
-    }
-    else
-    {
-        // Find the namespace...
-        Cell* frame_current = frame_top;
-        Cell* namespace_top = NULL;
-
-        while(frame_current != NULL)
-        {
-            if(IS_TYPE(frame_current->tag, TAG_TYPE_SYMBOL) && frame_current->car == namespace->car)
-            {
-                namespace_top = frame_current;
-                break;
-            }
-
-            frame_current = frame_current->cdr;
-        }
-
-        if(namespace_top == NULL)
-        {
-            return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find namespace"));
-        }
-
-        while(frame_current != NULL)
-        {
-            if(IS_TYPE(frame_current->tag, TAG_TYPE_SYMBOL))
-            {
-                return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find symbol in namespace"));
-            }
-
-            // Somewhat convoluted
-            Cell* found_def = frame_current->car;
-            Cell* found_sym = found_def->car;
-            if(found_sym->car == sym->car)
-            {
-                return found_def;
-            }
-            frame_current = frame_current->cdr;
-        }
-    }
-
-    // Eep
-    //printf("main: frame: couldn't find symbol\n");
-    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol"));
-
-    //return NULL;
-}
-
-Cell* frame_find_name(char* name)
-{
-    // Build a symbol locally.
-    Cell sym;
-    memory_build_symbol(&sym, name);
-    return frame_find(&sym, NULL, -1);
-}
-
-Cell* frame_set(Cell* sym, Cell* val)
-{
-    Cell* def = frame_find(sym, NULL, -1);
-    if(IS_TYPE(def->tag, TAG_TYPE_EXCEPTION))
-    {
-        return def;
-    }
-    else
-    {
-        def->cdr = val;
-        return def;
-    }
-}
-
-// Remove the last *count* definitions from the current frame.
-void frame_pop(int count)
-{
-    // Not error checking lol.
-    Cell* current = frame_top;
-    for(int i = 0; i < count; i++)
-    {
-        current = current->cdr;
-    }
-    frame_top = current;
-}
 
 Cell* fn_def(Cell* args)
 {
     Cell* evalarg = _evaluate_sexp(((Cell*)(args->cdr))->car);
-    frame_define(args->car, evalarg);
+    frame_push_def_in(&env_root, args->car, evalarg);
     return args->car;
 }
+
+Cell* fn_ldef(Cell* args)
+{
+    Cell* evalarg = _evaluate_sexp(((Cell*)(args->cdr))->car);
+    frame_push_def(args->car, evalarg);
+    return args->car;
+}
+
 
 // Real simple primitives.
 Cell* fn_car(Cell* args)
@@ -154,8 +39,6 @@ Cell* fn_car(Cell* args)
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
         return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'"));
-        //printf("fn: car: argument not of type 'list'\n");
-        //abort();
     }
 
     return first->car;
@@ -167,8 +50,6 @@ Cell* fn_cdr(Cell* args)
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
         return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'"));
-        //printf("fn: cdr: argument not of type 'list'\n");
-        //abort();
     }
 
     return first->cdr;
@@ -193,8 +74,6 @@ Cell* fn_add(Cell* args)
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("add: not a number"));
-            //printf("fn: add: not a number\n");
-            //abort();
         }
         acc += arg->num;
         args = args->cdr;
@@ -442,8 +321,15 @@ was_symbol_actually:
     return this_object;
 }
 
+Cell* _parse_sexps(char* inbuf)
+{
+    int idx = 0;
+    return _recurse_sexps(inbuf, &idx);    
+}
+
 Cell* fn_read(Cell* args)
 {
+    // TODO: merge with above?
     int idx = 0;
     return _recurse_sexps(replin, &idx);
 }
@@ -509,19 +395,22 @@ void _print_sexps(Cell* target)
 Cell* fn_print(Cell* args)
 {
     Cell* arg = args->car;
+    printf("\n");
     _print_sexps(arg);
+    printf(" ");
     return arg;
 }
 
-Cell* _seek_and_destroy(Cell* body, int depth)
+Cell* _seek_and_destroy(Cell* body, Cell* env)
 {
     if(!IS_TYPE(body->tag, TAG_TYPE_CONS))
     {
         if(IS_TYPE(body->tag, TAG_TYPE_SYMBOL))
         {
             // Look it up first
-            Cell* found = frame_find(body, NULL, depth);
-            if(found == NULL)
+            // Oh I need depth back
+            Cell* found = frame_find_def_in(env, body);
+            if(found == NULL || IS_TYPE(found->tag, TAG_TYPE_EXCEPTION))
                 return body;
             else
                 return found->cdr;
@@ -538,7 +427,7 @@ Cell* _seek_and_destroy(Cell* body, int depth)
 
         while(body != NULL)
         {
-            body->car = _seek_and_destroy(body->car, depth);
+            body->car = _seek_and_destroy(body->car, env);
             body = body->cdr;
         }
 
@@ -548,14 +437,16 @@ Cell* _seek_and_destroy(Cell* body, int depth)
 
 Cell* _evaluate_sexp(Cell* target)
 {
+    memory_gc_thresh(0.80);
+
     if(!IS_TYPE(target->tag, TAG_TYPE_CONS))
     {
         if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
         {
             // Look it up first
-            Cell* found = frame_find(target, NULL, -1)->cdr; // sus 
+            Cell* found = frame_find_def(target)->cdr; // sus 
             if(found == NULL)
-                return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: function undefined"));
+                return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: symbol undefined"));
             else
                 return found;
         }
@@ -571,10 +462,8 @@ Cell* _evaluate_sexp(Cell* target)
         Cell* func = target->car;
         Cell* args = target->cdr;
         int argc = 0;
-
+        
         if(IS_NIL(target)) return NIL;
-        //_print_sexps(func);
-        //printf("\n");
 
         func = _evaluate_sexp(func); 
         if(IS_TYPE(func->tag, TAG_TYPE_EXCEPTION)) { return func; }
@@ -598,13 +487,20 @@ Cell* _evaluate_sexp(Cell* target)
                     curr_arg = curr_arg->cdr;
                 }
 
+                frame_push_in(&temp_root, curr_arg);
+                argc++;
+
                 curr_arg->car = _evaluate_sexp(args->car); // see above
-                if(IS_TYPE(((Cell*)curr_arg->car)->tag, TAG_TYPE_EXCEPTION)) { return curr_arg->car; }
+                if(IS_TYPE(((Cell*)curr_arg->car)->tag, TAG_TYPE_EXCEPTION)) 
+                { 
+                    frame_pop_in(&temp_root, argc);
+                    return curr_arg->car; 
+                }
+
                 args = args->cdr;
             }
 
             args = proc_args;
-            argc++;
         }
         else
         {
@@ -619,7 +515,9 @@ Cell* _evaluate_sexp(Cell* target)
 
         if(IS_TYPE(func->tag, TAG_TYPE_BUILTIN))
         {
-            return ((Cell* (*)(Cell*))func->car)(args);
+            Cell* result = ((Cell* (*)(Cell*))func->car)(args);
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
+            return result;
         }
         else if(IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
         {
@@ -630,7 +528,7 @@ Cell* _evaluate_sexp(Cell* target)
 
             while(sig_list != NULL)
             {
-                frame_define(sig_list->car, todef->car);
+                frame_push_def(sig_list->car, todef->car);
                 expected++;
                 sig_list = sig_list->cdr;
                 todef = todef->cdr;
@@ -640,20 +538,23 @@ Cell* _evaluate_sexp(Cell* target)
 
             if(IS_SPEC(func->tag, TAG_SPEC_FUNMACRO))
             {
-                result = _seek_and_destroy(body, expected);
+                result = _seek_and_destroy(body, &env_top);
             }
             else
             {
                 result = _evaluate_sexp(body); // hmmm
             }
 
-            if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
             frame_pop(expected);
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
+
+            if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
 
             return result;
         }
         else
         {
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function"));
         }
     }
@@ -776,6 +677,7 @@ Cell* fn_tagbody(Cell* args)
             if(IS_TYPE(todo->tag, TAG_TYPE_SYMBOL))
             {
                 // forget it jake it's tagbody
+                current_step = current_step->cdr;
             }
             else
             {
@@ -788,6 +690,7 @@ Cell* fn_tagbody(Cell* args)
                     if(IS_SPEC(result->tag, TAG_SPEC_EX_LABEL))
                     {
                         hunting_for = result->car;
+                    //memory_free(result);
                         current_step = args;
                     }
                     else
@@ -823,7 +726,11 @@ Cell* fn_setq(Cell* args)
 {
     Cell* sym = memory_nth(args, 0)->car;
     Cell* newval = memory_nth(args, 1)->car;
-    Cell* result = frame_set(sym, newval);
+
+    newval = _evaluate_sexp(newval);
+    if(IS_TYPE(newval->tag, TAG_TYPE_EXCEPTION)) { return newval; }
+
+    Cell* result = frame_set_def(sym, newval);
 
     if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) 
     {
@@ -844,39 +751,49 @@ int main(int argc, char** argv)
 {
     // Start up core.
     memory_init(4096);
+    frame_init();
 
     // Start up the frame machinery.
-    frame_define_name("t", T);
-    frame_define_name("nil", NIL);
-    frame_define_name("def", memory_alloc_builtin(fn_def, TAG_SPEC_FUNLAZY));
-    frame_define_name("car", memory_alloc_builtin(fn_car, 0)); 
-    frame_define_name("cdr", memory_alloc_builtin(fn_cdr, 0)); 
-    frame_define_name("list", memory_alloc_builtin(fn_list, 0));
-    frame_define_name("quote", memory_alloc_builtin(fn_quote, TAG_SPEC_FUNLAZY));
-    frame_define_name("+", memory_alloc_builtin(fn_add, 0));
-    frame_define_name("-", memory_alloc_builtin(fn_sub, 0));
-    frame_define_name("*", memory_alloc_builtin(fn_mul, 0));
-    frame_define_name("/", memory_alloc_builtin(fn_div, 0));
-    frame_define_name("lambda", memory_alloc_builtin(fn_lambda, TAG_SPEC_FUNLAZY));
-    frame_define_name("macro", memory_alloc_builtin(fn_macro, TAG_SPEC_FUNLAZY));
-    frame_define_name("read", memory_alloc_builtin(fn_read, 0));
-    frame_define_name("print", memory_alloc_builtin(fn_print, 0));
-    frame_define_name("eval", memory_alloc_builtin(fn_eval, 0));
-    frame_define_name("eq", memory_alloc_builtin(fn_eq, 0));
-    frame_define_name("eql", memory_alloc_builtin(fn_eql, 0));
-    frame_define_name(">", memory_alloc_builtin(fn_gt, 0));
-    frame_define_name(">=", memory_alloc_builtin(fn_gteq, 0));
-    frame_define_name("<", memory_alloc_builtin(fn_lt, 0));
-    frame_define_name("<=", memory_alloc_builtin(fn_lteq, 0));
-    frame_define_name("==", memory_alloc_builtin(fn_numeq, 0));
-    frame_define_name("/=", memory_alloc_builtin(fn_numneq, 0));
-    frame_define_name("cond", memory_alloc_builtin(fn_cond, TAG_SPEC_FUNLAZY));
-    frame_define_name("go", memory_alloc_builtin(fn_go, TAG_SPEC_FUNLAZY));
-    frame_define_name("tagbody", memory_alloc_builtin(fn_tagbody, TAG_SPEC_FUNLAZY));
-    frame_define_name("setq", memory_alloc_builtin(fn_setq, TAG_SPEC_FUNLAZY));
-    frame_define_name("macroexpand", memory_alloc_builtin(fn_macroexpand, 0));
+    frame_push_defn_in(&env_root, "t", T);
+    frame_push_defn_in(&env_root, "nil", NIL);
+    frame_push_defn_in(&env_root, "def", memory_alloc_builtin(fn_def, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "car", memory_alloc_builtin(fn_car, 0)); 
+    frame_push_defn_in(&env_root, "cdr", memory_alloc_builtin(fn_cdr, 0)); 
+    frame_push_defn_in(&env_root, "list", memory_alloc_builtin(fn_list, 0));
+    frame_push_defn_in(&env_root, "quote", memory_alloc_builtin(fn_quote, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "+", memory_alloc_builtin(fn_add, 0));
+    frame_push_defn_in(&env_root, "-", memory_alloc_builtin(fn_sub, 0));
+    frame_push_defn_in(&env_root, "*", memory_alloc_builtin(fn_mul, 0));
+    frame_push_defn_in(&env_root, "/", memory_alloc_builtin(fn_div, 0));
+    frame_push_defn_in(&env_root, "lambda", memory_alloc_builtin(fn_lambda, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "macro", memory_alloc_builtin(fn_macro, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "read", memory_alloc_builtin(fn_read, 0));
+    frame_push_defn_in(&env_root, "print", memory_alloc_builtin(fn_print, 0));
+    frame_push_defn_in(&env_root, "eval", memory_alloc_builtin(fn_eval, 0));
+    frame_push_defn_in(&env_root, "eq", memory_alloc_builtin(fn_eq, 0));
+    frame_push_defn_in(&env_root, "eql", memory_alloc_builtin(fn_eql, 0));
+    frame_push_defn_in(&env_root, ">", memory_alloc_builtin(fn_gt, 0));
+    frame_push_defn_in(&env_root, ">=", memory_alloc_builtin(fn_gteq, 0));
+    frame_push_defn_in(&env_root, "<", memory_alloc_builtin(fn_lt, 0));
+    frame_push_defn_in(&env_root, "<=", memory_alloc_builtin(fn_lteq, 0));
+    frame_push_defn_in(&env_root, "==", memory_alloc_builtin(fn_numeq, 0));
+    frame_push_defn_in(&env_root, "/=", memory_alloc_builtin(fn_numneq, 0));
+    frame_push_defn_in(&env_root, "cond", memory_alloc_builtin(fn_cond, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "go", memory_alloc_builtin(fn_go, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "tagbody", memory_alloc_builtin(fn_tagbody, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "setq", memory_alloc_builtin(fn_setq, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "macroexpand", memory_alloc_builtin(fn_macroexpand, 0));
 
-    printf("Thanks lisp v1\n");
+    // And do some legwork.
+    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (cond (cd ys) (t no))))"));
+    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (tagbody (def i ct) g_loop bd (setq i (- i 1)) (cond ((> i 0) (go g_loop))) )))"));
+
+    // Set up garbage collection.
+    memory_add_root(&env_top);
+    memory_add_root(&temp_root);
+    memory_add_root(sym_top);
+
+    printf("Thanks lisp v2\n");
     printf("Now speaking to the lisp listener.\n");
     
     bool running = true;
@@ -911,18 +828,15 @@ int main(int argc, char** argv)
         if(replin[0] != '\0')
         {
             todo = fn_read(NULL);
+            memory_add_root(todo);
+            D(printf("---\n"));
             _print_sexps(_evaluate_sexp(todo));
             printf("\n");
+            memory_del_root(todo);
         }
-
-        memory_mark(frame_top);
-        memory_mark(sym_top);
-        memory_sweep();
     }
 
     printf("main: used %d/%d cells\n", memory_get_used(), 4096);
 
-    // TODO: exceptions/debugger?
-    //
     return 0;
 }

@@ -14,6 +14,9 @@ static Cell* free_top = NULL;
 static int free_used = 0;
 static int free_avail = 0;
 
+static Cell* roots[8];
+static int num_roots = 0;
+
 // A simple optimization. We throw these around as return values, so keep them allocated off the heap.
 Cell nil_cell;
 Cell true_cell;
@@ -240,11 +243,39 @@ Cell* memory_alloc_exception(int kind, Cell* data)
 
 // --- 
 
+void memory_free(Cell* target)
+{
+    // Manually free a cell we know we won't need again.
+    // Dragons: you bet
+    if(target == NIL || target == NULL) { return; }
+
+    if(IS_TYPE(target->tag, TAG_TYPE_CONS))
+    {
+        memory_free(target->car);
+        memory_free(target->cdr);
+    }
+    else if(IS_TYPE(target->tag, TAG_TYPE_LAMBDA))
+    {
+        memory_free(target->car);
+        memory_free(target->cdr);
+    }
+    else if(IS_TYPE(target->tag, TAG_TYPE_STRING))
+    {
+        free(target->car);
+    }
+
+    target->tag = TAG_MAGIC | TAG_TYPE_CONS;
+    target->car = NULL;
+    target->cdr = free_top;
+    free_top = target;
+}
+
 int memory_mark(Cell* begin)
 {
     if(begin == NULL) { return 0; }
 
     int found = 1;
+    if(begin->tag & TAG_MARKED) { found = 0; }
     begin->tag |= TAG_MARKED;
 
     if(IS_TYPE(begin->tag, TAG_TYPE_CONS))
@@ -253,16 +284,20 @@ int memory_mark(Cell* begin)
         found += memory_mark(begin->car);
         found += memory_mark(begin->cdr);
     }
-    if(IS_TYPE(begin->tag, TAG_TYPE_LAMBDA))
+    else if(IS_TYPE(begin->tag, TAG_TYPE_LAMBDA))
     {
         // Lambdas point to other cells too.
         found += memory_mark(begin->car);
         found += memory_mark(begin->cdr);
     }
-
     else if(IS_TYPE(begin->tag, TAG_TYPE_SYMBOL))
     {
         // Symbols have just one cell reference.
+        found += memory_mark(begin->car);
+    }
+    else if(IS_TYPE(begin->tag, TAG_TYPE_EXCEPTION))
+    {
+        // Exceptions have one also.
         found += memory_mark(begin->car);
     }
 
@@ -275,6 +310,8 @@ int memory_sweep()
     Cell* this_free_list = NULL;
     int new_avail = 0;
     int new_used = 0; // idk why I keep separating these, they're derivable from each other
+
+    D(printf("memory: using %d cells pre-sweep\n", free_used));
 
     for(int i = 0; i < num_cells; i++)
     {
@@ -316,4 +353,63 @@ int memory_sweep()
     free_top = new_free_list;
 
     return free_avail + free_used;
+}
+
+void memory_add_root(Cell* nroot)
+{
+    for(int i = 0; i < sizeof(roots)/sizeof(roots[0]); i++)
+    {
+        if(roots[i] == NULL)
+        {
+            roots[i] = nroot;
+            num_roots++;
+            return;
+        }
+    }
+}
+
+void memory_del_root(Cell* nroot)
+{
+    for(int i = 0; i < sizeof(roots)/sizeof(roots[0]); i++)
+    {
+        if(roots[i] == nroot)
+        {
+            roots[i] = NULL;
+            num_roots--;
+            return;
+        }
+    }
+}
+
+int memory_gc()
+{
+    int marked = 0;
+
+    for(int i = 0; i < sizeof(roots)/sizeof(roots[0]); i++)
+    {
+        if(roots[i] != NULL)
+            marked += memory_mark(roots[i]);
+    }
+
+    D(printf("memory: gc: marked %d cells from roots\n", marked));
+    return memory_sweep();
+}
+
+int memory_gc_thresh(double pct)
+{
+    int too_many = (double)num_cells * pct;
+    int used = 0;
+
+    if(free_used > too_many)
+    {
+        used = memory_gc();
+    }
+
+    if(free_used > too_many)
+    {
+        printf("memory: can't gc our way of this one\n");
+        abort();
+    }
+
+    return used;
 }
