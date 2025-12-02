@@ -690,7 +690,6 @@ Cell* fn_tagbody(Cell* args)
                     if(IS_SPEC(result->tag, TAG_SPEC_EX_LABEL))
                     {
                         hunting_for = result->car;
-                    //memory_free(result);
                         current_step = args;
                     }
                     else
@@ -747,6 +746,14 @@ Cell* fn_macroexpand(Cell* args)
     return _evaluate_sexp(args->car);
 }
 
+Cell* fn_garbage(Cell* args)
+{
+    int used = memory_gc();
+    printf("%d\n", used);
+    return memory_alloc_number(used);
+}
+
+
 int main(int argc, char** argv) 
 {
     // Start up core.
@@ -783,6 +790,7 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "tagbody", memory_alloc_builtin(fn_tagbody, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "setq", memory_alloc_builtin(fn_setq, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macroexpand", memory_alloc_builtin(fn_macroexpand, 0));
+    frame_push_defn_in(&env_root, "garbage", memory_alloc_builtin(fn_garbage, 0));
 
     // And do some legwork.
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (cond (cd ys) (t no))))"));
