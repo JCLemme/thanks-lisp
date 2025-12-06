@@ -14,8 +14,9 @@ static Cell* free_top = NULL;
 static int free_used = 0;
 static int free_avail = 0;
 
-static Cell* roots[8];
+static Cell* roots[16];
 static int num_roots = 0;
+static int rootshw = 0;
 
 // A simple optimization. We throw these around as return values, so keep them allocated off the heap.
 Cell nil_cell;
@@ -363,6 +364,10 @@ void memory_add_root(Cell* nroot)
         {
             roots[i] = nroot;
             num_roots++;
+            
+            if(num_roots > rootshw)
+                rootshw = num_roots;
+
             return;
         }
     }

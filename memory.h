@@ -7,7 +7,7 @@
 #ifndef _MEMORY_H
 #define _MEMORY_H
 
-#define TAG_MAGIC (0xEAULL << 56)
+#define TAG_MAGIC 0 //(0xEAULL << 56)
 #define TAG_MAGIC_MASK (0xFFULL << 56)
 
 #define IS_NIL(cell) (cell->car == NULL && cell->cdr == NULL)

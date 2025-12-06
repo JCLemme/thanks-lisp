@@ -401,7 +401,15 @@ Cell* fn_print(Cell* args)
     return arg;
 }
 
-Cell* _seek_and_destroy(Cell* body, Cell* env)
+// Evaluation
+// ----------
+
+Cell* _lambda_list_define_all(Cell* env, Cell* list, Cell* args)
+{
+    // Process a lambda list. Make the relevant defines and install them into the environment.
+}
+
+/*Cell* _seek_and_destroy(Cell* body, Cell* env)
 {
     if(!IS_TYPE(body->tag, TAG_TYPE_CONS))
     {
@@ -433,6 +441,15 @@ Cell* _seek_and_destroy(Cell* body, Cell* env)
 
         return backup;
     }
+}*/
+
+bool _is_macro_expr(Cell* list)
+{
+    if(!IS_TYPE(list->tag, TAG_TYPE_CONS)) { return false; }
+    Cell* func = memory_nth(list, 0);
+    if(!IS_TYPE(func->tag, TAG_TYPE_LAMBDA)) { return false; }
+    if(!IS_SPEC(func->tag, TAG_SPEC_FUNMACRO)) { return false; }
+    return true;
 }
 
 Cell* _evaluate_sexp(Cell* target)
@@ -480,6 +497,7 @@ Cell* _evaluate_sexp(Cell* target)
                 {
                     curr_arg = memory_alloc_cons(NULL, NULL);
                     proc_args = curr_arg;
+                    frame_push_in(&temp_root, curr_arg);
                 }
                 else
                 {
@@ -487,13 +505,13 @@ Cell* _evaluate_sexp(Cell* target)
                     curr_arg = curr_arg->cdr;
                 }
 
-                frame_push_in(&temp_root, curr_arg);
+                //frame_push_in(&temp_root, curr_arg);
                 argc++;
 
                 curr_arg->car = _evaluate_sexp(args->car); // see above
                 if(IS_TYPE(((Cell*)curr_arg->car)->tag, TAG_TYPE_EXCEPTION)) 
                 { 
-                    frame_pop_in(&temp_root, argc);
+                    frame_pop_in(&temp_root, 1);//argc);
                     return curr_arg->car; 
                 }
 
@@ -516,7 +534,7 @@ Cell* _evaluate_sexp(Cell* target)
         if(IS_TYPE(func->tag, TAG_TYPE_BUILTIN))
         {
             Cell* result = ((Cell* (*)(Cell*))func->car)(args);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
             return result;
         }
         else if(IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
@@ -538,7 +556,16 @@ Cell* _evaluate_sexp(Cell* target)
 
             if(IS_SPEC(func->tag, TAG_SPEC_FUNMACRO))
             {
-                result = _seek_and_destroy(body, &env_top);
+                result = body;
+                do {
+                    frame_push_in(&temp_root, result);
+                    result = _evaluate_sexp(result);
+                    frame_pop_in(&temp_root, 1);
+                } while(_is_macro_expr(result));
+                
+                frame_push_in(&temp_root, result);
+                result = _evaluate_sexp(result);
+                frame_pop_in(&temp_root, 1);
             }
             else
             {
@@ -546,7 +573,7 @@ Cell* _evaluate_sexp(Cell* target)
             }
 
             frame_pop(expected);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
 
             if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
 
@@ -554,7 +581,7 @@ Cell* _evaluate_sexp(Cell* target)
         }
         else
         {
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); }//argc); }
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function"));
         }
     }
@@ -793,8 +820,12 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "garbage", memory_alloc_builtin(fn_garbage, 0));
 
     // And do some legwork.
-    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (cond (cd ys) (t no))))"));
-    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (tagbody (def i ct) g_loop bd (setq i (- i 1)) (cond ((> i 0) (go g_loop))) )))"));
+    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
+    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'tagbody (list 'def 'i ct) 'g_loop bd (list 'setq 'i (list '- 'i '1)) (list 'cond (list (list '> 'i '0) (list 'go 'g_loop))) )))"));
+
+    _evaluate_sexp(_parse_sexps("(def not (lambda (ts) (cond (ts nil) (t t))))"));
+    _evaluate_sexp(_parse_sexps("(def tak (lambda (x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y)))))"));
+    _evaluate_sexp(_parse_sexps("(def ttak (lambda (x y z) (cond ((not (< y x)) z) (t (ttak (ttak (- x 1) y z) (ttak (- y 1) z x) (ttak (- z 1) x y))))))"));
 
     // Set up garbage collection.
     memory_add_root(&env_top);
