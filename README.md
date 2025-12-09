@@ -8,6 +8,7 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 * Garbage collection
 * Tagbodies
 * Lexical scoping
+* Closures
 * Macros
 * Usually doesn't segfault
 
@@ -15,6 +16,6 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 
 On a winning streak and didn't want to stop. New goal is christmas?
 
- ---
+---
  
 [^1]: Actually I did once. It was written in Python and it used Python lists instead of conses to build Lisp lists. Let's pretend I didn't

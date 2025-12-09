@@ -44,7 +44,7 @@ void memory_init(int cells)
     }
 
     // End of the line.
-    mem[num_cells-1].cdr = NULL;
+    mem[num_cells-1].cdr = NIL;
 
     // Preallocate cells for true and false.
     nil_cell.tag = TAG_MAGIC | TAG_TYPE_CONS;
@@ -58,13 +58,36 @@ int memory_get_used() { return free_used; }
 
 Cell* memory_nth(Cell* begin, int place) 
 {
-    if(begin == NULL || place <= 0) return begin;
+    if(IS_NIL(begin) || place <= 0) return begin;
     return memory_nth(begin->cdr, place - 1);
+}
+
+int memory_length(Cell* begin)
+{
+    if(IS_NIL(begin)) { return 0; }
+    return 1 + memory_length(begin->cdr);
+}
+
+Cell* memory_shallow_copy(Cell* begin)
+{
+    if(IS_NIL(begin)) { return NIL; }
+    Cell* copy = memory_alloc_cons(NIL, NIL);
+    Cell* save = copy;
+
+    while(!IS_NIL(begin))
+    {
+        copy->car = begin->car;
+        copy->cdr = memory_alloc_cons(NIL, NIL);
+        copy = copy->cdr;
+        begin = begin->cdr;
+    }
+
+    return save;
 }
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr)
 {
-    if(free_top->cdr == NULL || free_avail <= 0)
+    if(IS_NIL(((Cell*)free_top->cdr)) || free_avail <= 0)
     {
         printf("mem: out of cells!\n");
         return NULL;
@@ -97,7 +120,7 @@ void memory_build_number(Cell* found, double value)
 Cell* memory_alloc_number(double value)
 {
     // If the cell is invalid, we'll just segfault.
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_number(found, value);
     return found;
 }
@@ -109,6 +132,7 @@ void memory_build_string(Cell* found, char* src)
 
     if(len < 8)
     {
+        found->data = 0;
         strncpy((char*)&(found->data), src, len);
         found->tag = OF_TYPE(found->tag, TAG_TYPE_PSTRING);
         D(printf("memory: built packed string '%s' in cell %08x\n", &(found->data), found));
@@ -126,7 +150,7 @@ void memory_build_string(Cell* found, char* src)
 
 Cell* memory_alloc_string(char* src)
 {
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_string(found, src);
     return found;
 }
@@ -136,6 +160,7 @@ void memory_build_symbol(Cell* found, char* src)
     // Walk the symbol table please.
     Cell* sym_current = sym_top;
     Cell* sym_last = sym_top;
+    int len = strlen(src);
 
     found->tag = OF_TYPE(found->tag, TAG_TYPE_SYMBOL);
     D(printf("memory: building new symbol in cell %08x\n", found));
@@ -145,24 +170,28 @@ void memory_build_symbol(Cell* found, char* src)
     {
         // Attempt to match strings.
         Cell* str_current = sym_current->car;
-        if(str_current->tag == TAG_TYPE_PSTRING)
+        
+        if(1 || str_current->size == len)
         {
-            // It's packed.
-            if(strncmp(src, (char*)&(str_current->car), 7) == 0)
+            if(str_current->tag == TAG_TYPE_PSTRING)
             {
-                D(printf("memory: ...found packed in cell %08x\n", str_current));
-                found->car = str_current;
-                return;
+                // It's packed.
+                if(strncmp(src, (char*)&(str_current->car), 7) == 0)
+                {
+                    D(printf("memory: ...found packed in cell %08x\n", str_current));
+                    found->car = str_current;
+                    return;
+                }
             }
-        }
-        else
-        {
-            // It's not packed.
-            if(strcmp(src, str_current->car) == 0)
+            else
             {
-                D(printf("memory: ...found in cell %08x\n", str_current));
-                found->car = str_current;
-                return;
+                // It's not packed.
+                if(strcmp(src, str_current->car) == 0)
+                {
+                    D(printf("memory: ...found in cell %08x\n", str_current));
+                    found->car = str_current;
+                    return;
+                }
             }
         }
 
@@ -186,7 +215,7 @@ void memory_build_symbol(Cell* found, char* src)
 
 Cell* memory_alloc_symbol(char* src)
 {
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_symbol(found, src);
     return found;
 }
@@ -205,7 +234,7 @@ void memory_build_lambda(Cell* found, Cell* args, Cell* body, int tags)
 
 Cell* memory_alloc_lambda(Cell* args, Cell* body, int tags)
 {
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_lambda(found, args, body, tags);
     return found;
 }
@@ -222,7 +251,7 @@ void memory_build_builtin(Cell* found, Cell* (*primfunc)(Cell*), int tags)
 
 Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), int tags)
 {
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_builtin(found, primfunc, tags);
     return found;
 }
@@ -237,18 +266,43 @@ void memory_build_exception(Cell* found, int kind, Cell* data)
 
 Cell* memory_alloc_exception(int kind, Cell* data)
 {
-    Cell* found = memory_alloc_cons(NULL, NULL);
+    Cell* found = memory_alloc_cons(NIL, NIL);
     memory_build_exception(found, kind, data);
+    return found;
+}
+
+void memory_build_hardlink(Cell* found, Cell* data)
+{
+    found->tag = OF_TYPE(found->tag, TAG_TYPE_HARDLINK);
+    found->car = data;
+}
+
+Cell* memory_alloc_hardlink(Cell* data)
+{
+    Cell* found = memory_alloc_cons(NIL, NIL);
+    memory_build_hardlink(found, data);
     return found;
 }
 
 // --- 
 
+char* symbol_string_ptr(Cell* sym)
+{
+    Cell* symstr = sym->car;
+    if(IS_TYPE(symstr->tag, TAG_TYPE_PSTRING))
+        return (char*)&(symstr->car);
+    else
+        return (char*)symstr->car;
+
+}
+
+// ---
+
 void memory_free(Cell* target)
 {
     // Manually free a cell we know we won't need again.
     // Dragons: you bet
-    if(target == NIL || target == NULL) { return; }
+    if(IS_NIL(target)) { return; }
 
     if(IS_TYPE(target->tag, TAG_TYPE_CONS))
     {
@@ -273,7 +327,7 @@ void memory_free(Cell* target)
 
 int memory_mark(Cell* begin)
 {
-    if(begin == NULL) { return 0; }
+    if(IS_NIL(begin)) { return 0; }
 
     int found = 1;
     if(begin->tag & TAG_MARKED) { found = 0; }
@@ -299,6 +353,11 @@ int memory_mark(Cell* begin)
     else if(IS_TYPE(begin->tag, TAG_TYPE_EXCEPTION))
     {
         // Exceptions have one also.
+        found += memory_mark(begin->car);
+    }
+    else if(IS_TYPE(begin->tag, TAG_TYPE_HARDLINK))
+    {
+        // Same for hardlinks.
         found += memory_mark(begin->car);
     }
 
@@ -353,7 +412,7 @@ int memory_sweep()
     free_used = new_used;
     free_top = new_free_list;
 
-    return free_avail + free_used;
+    return free_used;
 }
 
 void memory_add_root(Cell* nroot)
@@ -412,7 +471,7 @@ int memory_gc_thresh(double pct)
 
     if(free_used > too_many)
     {
-        printf("memory: can't gc our way of this one\n");
+        printf("memory: can't gc our way out of this one\n");
         abort();
     }
 

@@ -7,6 +7,7 @@
 #include "memory.h"
 #include "frame.h"
 #include "util.h"
+#include "repl.h"
 
 #ifdef DEBUG
 #  define D(x) x
@@ -14,8 +15,9 @@
 #  define D(x)
 #endif
 
-Cell* _evaluate_sexp(Cell* target);
+#define CELL_AREA 40960
 
+static char errorzone[256];
 
 Cell* fn_def(Cell* args)
 {
@@ -38,6 +40,7 @@ Cell* fn_car(Cell* args)
     Cell* first = args->car;
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
+        _print_sexps(first);
         return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'"));
     }
 
@@ -46,6 +49,10 @@ Cell* fn_car(Cell* args)
 
 Cell* fn_cdr(Cell* args)
 {
+    // TODO: we shouldn't have to special case this...
+    if(args == NULL || args == NIL) { return NIL;}
+    if(args->car == NULL || args->car == NIL) { return NIL;}
+
     Cell* first = args->car;
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
@@ -65,10 +72,63 @@ Cell* fn_quote(Cell* args)
     return args->car;
 }
 
+Cell* fn_cons(Cell* args)
+{
+    Cell* new_car = memory_nth(args, 0)->car;
+    Cell* new_cdr = memory_nth(args, 1)->car;
+    return memory_alloc_cons(new_car, new_cdr);
+}
+
+Cell* fn_append(Cell* args)
+{
+    // Trying something different.
+    // (Bad)
+    int len = memory_length(args);
+
+    if(len == 0) { return NIL; }
+    if(len == 1) { return args->car; }
+    Cell* built = NULL;
+    Cell* save = NULL;
+
+    for(int i = 0; i < len - 1; i++)
+    {
+        if(args->car != NIL) 
+        {
+            Cell* copy = memory_shallow_copy(args->car);
+
+            if(built == NULL) 
+            { 
+                built = copy; 
+                save = copy;
+            }
+            else 
+            {
+                built->cdr = copy; 
+            }
+
+            int clen = memory_length(save);
+            built = memory_nth(save, clen - 1); // ignore -> // might break - check shallow copy algo
+        }
+
+        args = args->cdr;
+    }
+
+    built->cdr = args->car;
+
+    return save;
+}
+
+Cell* fn_null(Cell* args)
+{
+    // TODO: nearly time to flip case
+    if(args == NULL || args == NIL) { return T; }
+    return (IS_NIL(((Cell*)args->car))) ? T : NIL;
+}
+
 Cell* fn_add(Cell* args)
 {
     double acc = 0;
-    while(args != NULL)
+    while(!IS_NIL(args))
     {
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
@@ -86,7 +146,7 @@ Cell* fn_sub(Cell* args)
 {
     double acc = 0;
     bool first = true;
-    while(args != NULL)
+    while(!IS_NIL(args))
     {
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
@@ -112,7 +172,7 @@ Cell* fn_sub(Cell* args)
 Cell* fn_mul(Cell* args)
 {
     double acc = 1;
-    while(args != NULL)
+    while(!IS_NIL(args))
     {
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
@@ -130,7 +190,7 @@ Cell* fn_div(Cell* args)
 {
     double acc = 0;
     bool first = true;
-    while(args != NULL)
+    while(!IS_NIL(args))
     {
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
@@ -153,13 +213,26 @@ Cell* fn_div(Cell* args)
     return memory_alloc_number(acc);
 }
 
+Cell* fn_mod(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+    Cell* den = memory_nth(args, 1)->car;
+
+    return memory_alloc_number((int)num->num % (int)den->num);
+}
+
 Cell* fn_lambda(Cell* args)
 {
     // Args: a list of arguments, and a list of operations
     Cell* arglist = args->car;
     Cell* oplist = ((Cell*)(args->cdr))->car;
     // TODO: make sure the arglist is only symbols
-    return memory_alloc_lambda(arglist, oplist, 0);
+    Cell* result = memory_alloc_lambda(arglist, oplist, 0);            
+
+    // Closure conversion: capture anything from the lexical environment that we need
+    result->cdr = _hardlinker(result->cdr);
+
+    return result;
 }
 
 Cell* fn_macro(Cell* args)
@@ -175,157 +248,7 @@ Cell* fn_macro(Cell* args)
 
 // Reader operations.
 char replin[2048];
-char scratch[256];
 
-Cell* _recurse_sexps(char* buffer, int* index)
-{
-    // TODO: the readlist
-    Cell* this_object = NULL;
-    char c = buffer[(*index)];
-    int scridx = 0;
-
-    if(c == '\0')
-    {
-        return NULL;
-    }
-    else if(c == '(')
-    {
-        Cell* next_object = NULL;
-        (*index)++;
-        while(buffer[(*index)] == ' ') {(*index)++;}
-        c = buffer[(*index)];
-
-        while(c != ')')
-        {
-            if(next_object == NULL)
-            {
-                next_object = memory_alloc_cons(NULL, NULL);
-                this_object = next_object;
-            }
-            else
-            {
-                next_object->cdr = memory_alloc_cons(NULL, NULL);
-                next_object = next_object->cdr;
-            }
-
-            next_object->car = _recurse_sexps(buffer, index);
-
-            while(buffer[(*index)] == ' ') {(*index)++;}
-            c = buffer[(*index)];
-        }
-
-        // Nil won't set this_object - do it manually
-        if(this_object == NULL) this_object = NIL;
-
-        // Read off the end
-        (*index)++;
-    }
-    else if(c == '-' || c == '+' || isdigit(c))
-    {
-        // The cursed logic in this function:
-        // * symbols can *also* start with a plus/minus (but not numbers)
-        // * numbers don't always start with a sign
-        // * goto considered fun and interesting
-        int backup_index = *index;
-        char backup_c = c;
-        char first_dig = (isdigit(c)) ? c : 0;
-
-        do
-        {
-            scratch[scridx++] = c;
-            (*index)++;
-            c = buffer[*index];
-            if(first_dig == 0) first_dig = c;
-        }
-        while(c == '.' || isdigit(c));
-        scratch[scridx] = '\0';
-
-        if(!isdigit(first_dig) && first_dig != '\0')
-        {
-            *index = backup_index;
-            c = backup_c;
-            scridx = 0;
-            //printf("%c\n", scratch[1]);
-            goto was_symbol_actually;
-        }
-
-        // TODO: an input of just "+" becomes 0 - I think it's the null terminator detector breaking
-        this_object = memory_alloc_number(atof(scratch));
-    }
-    else if(c == '"')
-    {
-        // TODO: ew
-        (*index)++;
-        c = buffer[*index];
-        bool escaped = false;
-        bool looking = true;
-
-        do
-        {
-            if(escaped)
-            {
-                escaped = false;
-                if(c == 'n')
-                    scratch[scridx++] = '\n';
-                else if(c == '0')
-                    scratch[scridx++] = '\0';
-                else if(c == 'r')
-                    scratch[scridx++] = '\r';
-                else if(c == 't')
-                    scratch[scridx++] = '\t';
-                else if(c == '"')
-                    scratch[scridx++] = '"';
-                else if(c == '\\')
-                    scratch[scridx++] = '\\';
-                else
-                    scratch[scridx++] = '!';
-            }
-            else
-            {
-                if(c == '\\')
-                    escaped = true;
-                else if(c == '"')
-                    looking = false;
-                else
-                    scratch[scridx++] = c;
-            }
-
-            (*index)++;
-            c = buffer[*index];
-        }
-        while(looking && c != '\0');
-        scratch[scridx] = '\0';
-
-        this_object = memory_alloc_string(scratch);
-    }
-    else if(c == '\'')
-    {
-        (*index)++;
-        this_object = memory_alloc_cons(memory_alloc_symbol("quote"), memory_alloc_cons(_recurse_sexps(buffer, index), NULL));
-    }
-    else
-    {
-was_symbol_actually:
-        do
-        {
-            scratch[scridx++] = c;
-            (*index)++;
-            c = buffer[*index];
-        }
-        while(c != ' ' && c != ')' && c != '\0');
-        scratch[scridx] = '\0';
-
-        this_object = memory_alloc_symbol(scratch);
-    }
-
-    return this_object;
-}
-
-Cell* _parse_sexps(char* inbuf)
-{
-    int idx = 0;
-    return _recurse_sexps(inbuf, &idx);    
-}
 
 Cell* fn_read(Cell* args)
 {
@@ -334,258 +257,14 @@ Cell* fn_read(Cell* args)
     return _recurse_sexps(replin, &idx);
 }
 
-void _print_sexps(Cell* target)
-{
-    if(target == NULL) return;
-
-    if(IS_TYPE(target->tag, TAG_TYPE_CONS))
-    {
-        printf("(");
-        while(target != NULL)
-        {
-            _print_sexps(target->car);
-            printf(" ");
-            target = target->cdr;
-        }
-        printf("\b)");
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_NUMBER))
-    {
-        print_double(target->num);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_LAMBDA))
-    {
-        printf("<lambda at %08x>", target->car);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
-    {
-        Cell* symstr = target->car;
-        // TODO: auto type crushing for strings
-        if(IS_TYPE(symstr->tag, TAG_TYPE_PSTRING))
-            printf("%s", (char*)&(symstr->car));
-        else
-            printf("%s", (char*)symstr->car);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_PSTRING))
-    {
-        printf("\"%s\"", (char*)&(target->car));
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_STRING))
-    {
-        printf("\"%s\"", (char*)target->car);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_ARRAY))
-    {
-        printf("<array at %08x>", target->car);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_BUILTIN))
-    {
-        printf("<builtin at %08x>", target->car);
-    }
-    else if(IS_TYPE(target->tag, TAG_TYPE_EXCEPTION))
-    {
-        printf("Exception (type %d) in %s", ((target->tag & TAG_SPEC_MASK) >> 8), ((Cell*)target->car)->car);
-    }
-    else
-    {
-        printf("<unknown type %d at %08x>", target->tag, target);
-    }
-}
-
 Cell* fn_print(Cell* args)
 {
     Cell* arg = args->car;
-    printf("\n");
     _print_sexps(arg);
-    printf(" ");
+    printf("\n");
     return arg;
 }
 
-// Evaluation
-// ----------
-
-Cell* _lambda_list_define_all(Cell* env, Cell* list, Cell* args)
-{
-    // Process a lambda list. Make the relevant defines and install them into the environment.
-}
-
-/*Cell* _seek_and_destroy(Cell* body, Cell* env)
-{
-    if(!IS_TYPE(body->tag, TAG_TYPE_CONS))
-    {
-        if(IS_TYPE(body->tag, TAG_TYPE_SYMBOL))
-        {
-            // Look it up first
-            // Oh I need depth back
-            Cell* found = frame_find_def_in(env, body);
-            if(found == NULL || IS_TYPE(found->tag, TAG_TYPE_EXCEPTION))
-                return body;
-            else
-                return found->cdr;
-        }
-        else
-        {
-            // It's an atom - return it
-            return body;
-        }
-    }
-    else
-    {
-        Cell* backup = body;
-
-        while(body != NULL)
-        {
-            body->car = _seek_and_destroy(body->car, env);
-            body = body->cdr;
-        }
-
-        return backup;
-    }
-}*/
-
-bool _is_macro_expr(Cell* list)
-{
-    if(!IS_TYPE(list->tag, TAG_TYPE_CONS)) { return false; }
-    Cell* func = memory_nth(list, 0);
-    if(!IS_TYPE(func->tag, TAG_TYPE_LAMBDA)) { return false; }
-    if(!IS_SPEC(func->tag, TAG_SPEC_FUNMACRO)) { return false; }
-    return true;
-}
-
-Cell* _evaluate_sexp(Cell* target)
-{
-    memory_gc_thresh(0.80);
-
-    if(!IS_TYPE(target->tag, TAG_TYPE_CONS))
-    {
-        if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
-        {
-            // Look it up first
-            Cell* found = frame_find_def(target)->cdr; // sus 
-            if(found == NULL)
-                return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: symbol undefined"));
-            else
-                return found;
-        }
-        else
-        {
-            // It's an atom - return it
-            return target;
-        }
-    }
-    else
-    {
-        // It's a list - evaluate
-        Cell* func = target->car;
-        Cell* args = target->cdr;
-        int argc = 0;
-        
-        if(IS_NIL(target)) return NIL;
-
-        func = _evaluate_sexp(func); 
-        if(IS_TYPE(func->tag, TAG_TYPE_EXCEPTION)) { return func; }
-
-        if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY))
-        {
-            // Normal function - evaluate arguments first
-            Cell* proc_args = NULL;
-            Cell* curr_arg = NULL;
- 
-            while(args != NULL)
-            {
-                if(curr_arg == NULL)
-                {
-                    curr_arg = memory_alloc_cons(NULL, NULL);
-                    proc_args = curr_arg;
-                    frame_push_in(&temp_root, curr_arg);
-                }
-                else
-                {
-                    curr_arg->cdr = memory_alloc_cons(NULL, NULL);
-                    curr_arg = curr_arg->cdr;
-                }
-
-                //frame_push_in(&temp_root, curr_arg);
-                argc++;
-
-                curr_arg->car = _evaluate_sexp(args->car); // see above
-                if(IS_TYPE(((Cell*)curr_arg->car)->tag, TAG_TYPE_EXCEPTION)) 
-                { 
-                    frame_pop_in(&temp_root, 1);//argc);
-                    return curr_arg->car; 
-                }
-
-                args = args->cdr;
-            }
-
-            args = proc_args;
-        }
-        else
-        {
-            // Literally just counting.
-            Cell* backup_args = args;
-            while(backup_args != NULL) 
-            {
-                backup_args = backup_args->cdr;
-                argc++;
-            }
-        }
-
-        if(IS_TYPE(func->tag, TAG_TYPE_BUILTIN))
-        {
-            Cell* result = ((Cell* (*)(Cell*))func->car)(args);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
-            return result;
-        }
-        else if(IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
-        {
-            Cell* sig_list = func->car;
-            Cell* body = func->cdr;
-            Cell* todef = args;
-            int expected = 0;
-
-            while(sig_list != NULL)
-            {
-                frame_push_def(sig_list->car, todef->car);
-                expected++;
-                sig_list = sig_list->cdr;
-                todef = todef->cdr;
-            }
-
-            Cell* result = NULL;
-
-            if(IS_SPEC(func->tag, TAG_SPEC_FUNMACRO))
-            {
-                result = body;
-                do {
-                    frame_push_in(&temp_root, result);
-                    result = _evaluate_sexp(result);
-                    frame_pop_in(&temp_root, 1);
-                } while(_is_macro_expr(result));
-                
-                frame_push_in(&temp_root, result);
-                result = _evaluate_sexp(result);
-                frame_pop_in(&temp_root, 1);
-            }
-            else
-            {
-                result = _evaluate_sexp(body); // hmmm
-            }
-
-            frame_pop(expected);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
-
-            if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) { return result; }
-
-            return result;
-        }
-        else
-        {
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); }//argc); }
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function"));
-        }
-    }
-}
 
 Cell* fn_eval(Cell* args)
 {
@@ -654,7 +333,7 @@ Cell* fn_numneq(Cell* args)
 
 Cell* fn_cond(Cell* args)
 {
-    while(args != NULL)
+    while(!IS_NIL(args))
     {
         Cell* test = memory_nth(args->car, 0)->car;
         Cell* body = memory_nth(args->car, 1)->car;
@@ -694,7 +373,7 @@ Cell* fn_tagbody(Cell* args)
     
     // TODO: needs a cache so bad
     
-    while(current_step != NULL)
+    while(!IS_NIL(current_step))
     {
         Cell* todo = current_step->car;
 
@@ -755,8 +434,18 @@ Cell* fn_setq(Cell* args)
 
     newval = _evaluate_sexp(newval);
     if(IS_TYPE(newval->tag, TAG_TYPE_EXCEPTION)) { return newval; }
+    Cell* result = NULL;
 
-    Cell* result = frame_set_def(sym, newval);
+    if(IS_TYPE(sym->tag, TAG_TYPE_SYMBOL))
+    {
+        result = frame_set_def(sym, newval);
+    }
+    else if(IS_TYPE(sym->tag, TAG_TYPE_HARDLINK))
+    {
+        Cell* linked_def = sym->car;
+        linked_def->cdr = newval;
+        result = NIL;
+    }
 
     if(IS_TYPE(result->tag, TAG_TYPE_EXCEPTION)) 
     {
@@ -764,27 +453,136 @@ Cell* fn_setq(Cell* args)
     }
     else
     {
-        return sym;
+        return newval;
     }
+}
+
+Cell* fn_let(Cell* args)
+{
+    Cell* variables = memory_nth(args, 0)->car;
+    Cell* form = memory_nth(args, 1)->car;
+    int expected = 0;
+
+    while(!IS_NIL(variables))
+    {
+        Cell* varlist = variables->car;
+        Cell* sym = memory_nth(varlist, 0)->car;
+        Cell* val = memory_nth(varlist, 1)->car;
+
+        val = _evaluate_sexp(val);
+        if(IS_TYPE(val->tag, TAG_TYPE_EXCEPTION))
+        {
+            frame_pop_in(&env_top, expected);
+            return val;
+        }
+
+        frame_push_def_in(&env_top, sym, val);
+        expected++;
+        variables = variables->cdr;
+    }
+
+    Cell* result = _evaluate_sexp(form);
+
+    frame_pop_in(&env_top, expected);
+    return result;
 }
 
 Cell* fn_macroexpand(Cell* args)
 {
-    return _evaluate_sexp(args->car);
+    return _macroexpand(args->car);
 }
 
 Cell* fn_garbage(Cell* args)
 {
     int used = memory_gc();
-    printf("%d\n", used);
     return memory_alloc_number(used);
 }
 
+Cell* fn_pyprint(Cell* args)
+{
+    while(!IS_NIL(args))
+    {
+        Cell* next = args->car;
+
+        if(IS_TYPE(next->tag, TAG_TYPE_PSTRING))
+        {
+            printf("%s", (char*)&(next->car));
+        }
+        else if(IS_TYPE(next->tag, TAG_TYPE_STRING))
+        {
+            printf("%s", (char*)next->car);
+        }
+        else
+        {
+            _print_sexps(next);
+        }
+
+        args = args->cdr;
+    }
+
+    printf("\n");
+    return NIL;
+}
+
+Cell* fn_progn(Cell* args)
+{
+    // Our (eval) executes these statements in order anyway - just return the last argument.
+    if(args == NULL || args == NIL) { return NIL; }
+    return memory_nth(args, memory_length(args) - 1)->car;
+}
+
+Cell* fn_and(Cell* args)
+{
+    Cell* last = T;
+
+    while(!IS_NIL(args))
+    {
+        if(args->car == NIL) { return NIL; }
+        last = args->car;
+        args = args->cdr;
+    }
+
+    return last;
+}
+
+Cell* fn_or(Cell* args)
+{
+    while(!IS_NIL(args))
+    {
+        if(args->car != NIL) { return args->car; }
+        args = args->cdr;
+    }
+
+    return NIL;
+}
+
+Cell* fn_when(Cell* args)
+{
+    // This can be a macro once I implement &rest in lambda-lists
+    Cell* condition = args->car;
+    Cell* body_list = args->cdr;
+    Cell* last = NIL;
+
+    Cell* result = _evaluate_sexp(condition);
+    if(IS_NIL(result)) { return NIL; }
+
+    Cell* todo = body_list;
+    while(!IS_NIL(todo))
+    {
+        last = _evaluate_sexp(todo->car);
+        if(IS_TYPE(last->tag, TAG_TYPE_EXCEPTION)) { return last; }
+        todo = todo->cdr;
+    }
+
+    return last;
+}
+
+// -- -- -- -- --
 
 int main(int argc, char** argv) 
 {
     // Start up core.
-    memory_init(4096);
+    memory_init(CELL_AREA);
     frame_init();
 
     // Start up the frame machinery.
@@ -795,10 +593,14 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "cdr", memory_alloc_builtin(fn_cdr, 0)); 
     frame_push_defn_in(&env_root, "list", memory_alloc_builtin(fn_list, 0));
     frame_push_defn_in(&env_root, "quote", memory_alloc_builtin(fn_quote, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "cons", memory_alloc_builtin(fn_cons, 0));
+    frame_push_defn_in(&env_root, "append", memory_alloc_builtin(fn_append, 0));
+    frame_push_defn_in(&env_root, "null", memory_alloc_builtin(fn_null, 0));
     frame_push_defn_in(&env_root, "+", memory_alloc_builtin(fn_add, 0));
     frame_push_defn_in(&env_root, "-", memory_alloc_builtin(fn_sub, 0));
     frame_push_defn_in(&env_root, "*", memory_alloc_builtin(fn_mul, 0));
     frame_push_defn_in(&env_root, "/", memory_alloc_builtin(fn_div, 0));
+    frame_push_defn_in(&env_root, "mod", memory_alloc_builtin(fn_mod, 0));
     frame_push_defn_in(&env_root, "lambda", memory_alloc_builtin(fn_lambda, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macro", memory_alloc_builtin(fn_macro, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "read", memory_alloc_builtin(fn_read, 0));
@@ -816,13 +618,24 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "go", memory_alloc_builtin(fn_go, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "tagbody", memory_alloc_builtin(fn_tagbody, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "setq", memory_alloc_builtin(fn_setq, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "let", memory_alloc_builtin(fn_let, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macroexpand", memory_alloc_builtin(fn_macroexpand, 0));
     frame_push_defn_in(&env_root, "garbage", memory_alloc_builtin(fn_garbage, 0));
+    frame_push_defn_in(&env_root, "pyprint", memory_alloc_builtin(fn_pyprint, 0));
+    frame_push_defn_in(&env_root, "progn", memory_alloc_builtin(fn_progn, 0));
+    frame_push_defn_in(&env_root, "and", memory_alloc_builtin(fn_and, 0));
+    frame_push_defn_in(&env_root, "or", memory_alloc_builtin(fn_or, 0));
+    frame_push_defn_in(&env_root, "when", memory_alloc_builtin(fn_when, TAG_SPEC_FUNLAZY));
 
     // And do some legwork.
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
-    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'tagbody (list 'def 'i ct) 'g_loop bd (list 'setq 'i (list '- 'i '1)) (list 'cond (list (list '> 'i '0) (list 'go 'g_loop))) )))"));
-
+    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
+    
+    _evaluate_sexp(_parse_sexps("(def plusp (lambda (qu) (> qu 0)))"));
+    _evaluate_sexp(_parse_sexps("(def first (lambda (qu) (car qu)))"));
+    _evaluate_sexp(_parse_sexps("(def second (lambda (qu) (car (cdr qu))))"));
+    _evaluate_sexp(_parse_sexps("(def rest (lambda (qu) (cdr qu)))"));
+    
     _evaluate_sexp(_parse_sexps("(def not (lambda (ts) (cond (ts nil) (t t))))"));
     _evaluate_sexp(_parse_sexps("(def tak (lambda (x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y)))))"));
     _evaluate_sexp(_parse_sexps("(def ttak (lambda (x y z) (cond ((not (< y x)) z) (t (ttak (ttak (- x 1) y z) (ttak (- y 1) z x) (ttak (- z 1) x y))))))"));
@@ -875,7 +688,7 @@ int main(int argc, char** argv)
         }
     }
 
-    printf("main: used %d/%d cells\n", memory_get_used(), 4096);
+    printf("main: used %d/%d cells (%d%%)\n", memory_get_used(), CELL_AREA, (memory_get_used() / CELL_AREA) * 100);
 
     return 0;
 }

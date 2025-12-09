@@ -10,7 +10,7 @@
 #define TAG_MAGIC 0 //(0xEAULL << 56)
 #define TAG_MAGIC_MASK (0xFFULL << 56)
 
-#define IS_NIL(cell) (cell->car == NULL && cell->cdr == NULL)
+#define IS_NIL(cell) (cell == NULL || cell == &nil_cell || (cell->car == NULL && cell->cdr == NULL) || (cell->car == &nil_cell && cell->cdr == &nil_cell))
 #define NIL (&nil_cell)
 #define IS_T(cell) (!IS_NIL(cell))
 #define T (&true_cell)
@@ -29,6 +29,7 @@
 #define TAG_TYPE_ARRAY      (0x07)
 #define TAG_TYPE_BUILTIN    (0x08)
 #define TAG_TYPE_EXCEPTION  (0x09)
+#define TAG_TYPE_HARDLINK   (0x0A)
 
 #define TAG_SPEC_MASK       (0xFF << 8)
 #define OF_SPEC(tag, spec)  ((tag & ~TAG_SPEC_MASK) | spec)
@@ -76,6 +77,8 @@ void memory_init(int cells);
 int memory_get_used();
 
 Cell* memory_nth(Cell* begin, int place);
+int memory_length(Cell* begin);
+Cell* memory_shallow_copy(Cell* begin);
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr);
 
@@ -96,10 +99,14 @@ Cell* memory_alloc_builtin(Cell* (*primfunc)(Cell*), int tags);
 void memory_build_exception(Cell* found, int kind, Cell* data);
 Cell* memory_alloc_exception(int kind, Cell* data);
 
+void memory_build_hardlink(Cell* found, Cell* data);
+Cell* memory_alloc_hardlink(Cell* data);
+
 // ---
 
 bool symbol_eql(Cell* one, Cell* two);
 bool string_eql(Cell* one, Cell* two);
+char* symbol_string_ptr(Cell* sym);
 
 // ---
 

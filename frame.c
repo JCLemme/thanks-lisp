@@ -46,7 +46,7 @@ Cell* frame_push_defn_in(Cell* pkg, char* name, Cell* value)
 Cell* frame_pop_in(Cell* pkg, int count)
 {
     Cell* walker = pkg->cdr;
-    while((walker != NULL || walker != NIL) && (count-- > 0))
+    while(!IS_NIL(walker) && (count-- > 0))
     {
         walker = walker->cdr;
     }
@@ -101,7 +101,7 @@ Cell* frame_free_package(Cell* pkg)
 Cell* frame_find_def_in(Cell* pkg, Cell* name)
 {
     Cell* walker = pkg->cdr;
-    while(walker != NULL && walker != NIL)
+    while(!IS_NIL(walker))
     {
         Cell* this_def = walker->car;
 
@@ -131,7 +131,7 @@ Cell* frame_find_defn_in(Cell* pkg, char* name)
 Cell* frame_find_def_from(Cell* pkg, Cell* name)
 {
     Cell* walker = pkg->cdr;
-    while(walker != NULL && walker != NIL)
+    while(!IS_NIL(walker))
     {
         Cell* this_def = walker->car;
 
@@ -167,7 +167,7 @@ Cell* frame_find_defn(char* name)
 Cell* frame_find_package(Cell* name)
 {
     Cell* walker = &env_top;
-    while(walker != NULL && walker != NIL)
+    while(!IS_NIL(walker))
     {
         Cell* this_def = walker->car;
 
