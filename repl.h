@@ -13,10 +13,16 @@
 #ifndef _REPL_H
 #define _REPL_H
 
+typedef int (*read_callback_t)(void*);
+typedef int (*write_callback_t)(char*, int, void*);
+
 Cell* _recurse_sexps(char* buffer, int* index);
 Cell* _parse_sexps(char* inbuf);
 
+int _write_to_stdout(char* src, int len, void* state);
 void _print_sexps(Cell* target);
+void _print_sexps_to(char* dest, int size, Cell* target);
+void _print_sexps_to_file(FILE* dest, Cell* target);
 
 int _lambda_list_define_all(Cell* env, Cell* list, Cell* args);
 bool _is_macro_expr(Cell* list);

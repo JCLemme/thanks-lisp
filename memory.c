@@ -47,11 +47,12 @@ void memory_init(int cells)
     mem[num_cells-1].cdr = NIL;
 
     // Preallocate cells for true and false.
-    nil_cell.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    nil_cell.tag = TAG_MAGIC | TAG_STATIC | TAG_TYPE_CONS;
     nil_cell.car = NULL;
     nil_cell.cdr = NULL;
 
     memory_build_symbol(&true_cell, "t");
+    true_cell.tag |= TAG_STATIC;
 }
 
 int memory_get_used() { return free_used; }
@@ -284,6 +285,19 @@ Cell* memory_alloc_hardlink(Cell* data)
     return found;
 }
 
+void memory_build_stream(Cell* found, void* repr)
+{
+    found->tag = OF_TYPE(found->tag, TAG_TYPE_STREAM);
+    found->car = repr;
+}
+
+Cell* memory_alloc_stream(void* repr)
+{
+    Cell* found = memory_alloc_cons(NIL, NIL);
+    memory_build_stream(found, repr);
+    return found;
+}
+
 // --- 
 
 char* symbol_string_ptr(Cell* sym)
@@ -294,6 +308,14 @@ char* symbol_string_ptr(Cell* sym)
     else
         return (char*)symstr->car;
 
+}
+
+char* string_ptr(Cell* str)
+{
+    if(IS_TYPE(str->tag, TAG_TYPE_PSTRING))
+        return (char*)&(str->car);
+    else
+        return (char*)str->car;
 }
 
 // ---

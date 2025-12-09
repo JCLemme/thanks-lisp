@@ -577,6 +577,77 @@ Cell* fn_when(Cell* args)
     return last;
 }
 
+Cell* fn_open(Cell* args)
+{
+    Cell* filename = memory_nth(args, 0)->car;
+    Cell* mode = memory_nth(args, 1)->car;
+    
+    // pain
+    FILE* file = fopen(string_ptr(filename), symbol_string_ptr(mode)+1);
+    if(file == NULL)
+        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("open: error opening file"));
+
+    return memory_alloc_stream((void*)file);
+}
+
+Cell* fn_close(Cell* args)
+{
+    Cell* stream = args->car;
+    fclose(stream->car);
+    return NIL;
+}
+
+Cell* fn_stderr(Cell* args)
+{
+    return memory_alloc_stream((void*)stderr);
+}
+
+Cell* fn_print_to(Cell* args)
+{
+    Cell* stream = memory_nth(args, 0)->car;
+    Cell* target = memory_nth(args, 1)->car;
+
+    _print_sexps_to_file((FILE*)stream->car, target);
+    fprintf((FILE*)stream->car, "\n");
+
+    return target; 
+}
+
+Cell* fn_pyprint_to(Cell* args)
+{
+    Cell* stream = args->car;
+    args = args->cdr;
+    FILE* file = (FILE*)stream->car;
+
+    while(!IS_NIL(args))
+    {
+        Cell* next = args->car;
+
+        if(IS_TYPE(next->tag, TAG_TYPE_PSTRING))
+        {
+            fprintf(file, "%s", (char*)&(next->car));
+        }
+        else if(IS_TYPE(next->tag, TAG_TYPE_STRING))
+        {
+            fprintf(file, "%s", (char*)next->car);
+        }
+        else
+        {
+            _print_sexps_to_file(file, next);
+        }
+
+        args = args->cdr;
+    }
+
+    fprintf(file, "\n");
+    return NIL;
+}
+
+Cell* fn_env_root(Cell* args)
+{
+    return &env_root;
+}
+
 // -- -- -- -- --
 
 int main(int argc, char** argv) 
@@ -626,7 +697,13 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "and", memory_alloc_builtin(fn_and, 0));
     frame_push_defn_in(&env_root, "or", memory_alloc_builtin(fn_or, 0));
     frame_push_defn_in(&env_root, "when", memory_alloc_builtin(fn_when, TAG_SPEC_FUNLAZY));
-
+    frame_push_defn_in(&env_root, "open", memory_alloc_builtin(fn_open, 0));
+    frame_push_defn_in(&env_root, "close", memory_alloc_builtin(fn_close, 0));
+    frame_push_defn_in(&env_root, "stderr", memory_alloc_builtin(fn_stderr, 0));
+    frame_push_defn_in(&env_root, "print-to", memory_alloc_builtin(fn_print_to, 0));
+    //frame_push_defn_in(&env_root, "pyprint-to", memory_alloc_builtin(fn_pyprint_to, 0));
+    frame_push_defn_in(&env_root, "env-root", memory_alloc_builtin(fn_env_root, 0));
+    
     // And do some legwork.
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
     _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
@@ -682,7 +759,8 @@ int main(int argc, char** argv)
             todo = fn_read(NULL);
             memory_add_root(todo);
             D(printf("---\n"));
-            _print_sexps(_evaluate_sexp(todo));
+            Cell* res = _evaluate_sexp(todo);
+            _print_sexps(res);
             printf("\n");
             memory_del_root(todo);
         }

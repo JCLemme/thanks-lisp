@@ -30,6 +30,7 @@
 #define TAG_TYPE_BUILTIN    (0x08)
 #define TAG_TYPE_EXCEPTION  (0x09)
 #define TAG_TYPE_HARDLINK   (0x0A)
+#define TAG_TYPE_STREAM     (0x0B)
 
 #define TAG_SPEC_MASK       (0xFF << 8)
 #define OF_SPEC(tag, spec)  ((tag & ~TAG_SPEC_MASK) | spec)
@@ -43,8 +44,14 @@
 #define TAG_SPEC_EX_TYPE    (0x03 << 8) // wrong kind of object
 #define TAG_SPEC_EX_VALUE   (0x04 << 8) // ???
 #define TAG_SPEC_EX_DATA    (0x05 << 8) // wasn't found, etc.
+#define TAG_SPEC_EX_IO      (0x06 << 8) // error in io op
 
-#define TAG_MARKED          (0x10000)
+// TODO: the whole stream interface is sus
+#define TAG_SPEC_STM_FILE   (0x01 << 8) // file IO
+
+#define TAG_MEMORY_MASK     (0xFF << 16)
+#define TAG_MARKED          (0x01 << 16)
+#define TAG_STATIC          (0x02 << 16)
 
 // Unsure if exceptions should be their own type.
 
@@ -102,11 +109,15 @@ Cell* memory_alloc_exception(int kind, Cell* data);
 void memory_build_hardlink(Cell* found, Cell* data);
 Cell* memory_alloc_hardlink(Cell* data);
 
+void memory_build_stream(Cell* found, void* repr);
+Cell* memory_alloc_stream(void* repr);
+
 // ---
 
 bool symbol_eql(Cell* one, Cell* two);
 bool string_eql(Cell* one, Cell* two);
 char* symbol_string_ptr(Cell* sym);
+char* string_ptr(Cell* str);
 
 // ---
 
