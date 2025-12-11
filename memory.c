@@ -172,7 +172,7 @@ void memory_build_symbol(Cell* found, char* src)
         // Attempt to match strings.
         Cell* str_current = sym_current->car;
         
-        if(1 || str_current->size == len)
+        if(str_current->size == len)
         {
             if(str_current->tag == TAG_TYPE_PSTRING)
             {
@@ -318,6 +318,12 @@ char* string_ptr(Cell* str)
         return (char*)str->car;
 }
 
+bool symbol_is_keyword(Cell* sym)
+{
+    char* str = symbol_string_ptr(sym);
+    return (str[0] == ':');
+}
+
 // ---
 
 void memory_free(Cell* target)
@@ -349,7 +355,15 @@ void memory_free(Cell* target)
 
 int memory_mark(Cell* begin)
 {
-    if(IS_NIL(begin)) { return 0; }
+    if(begin == NULL) { return 0; }
+
+    // Reachable NIL cells still need to be marked.
+    // Note the above case: a NULL NIL cell can't be marked...
+    if(IS_NIL(begin)) 
+    { 
+        begin->tag |= TAG_MARKED;
+        return 0; 
+    }
 
     int found = 1;
     if(begin->tag & TAG_MARKED) { found = 0; }

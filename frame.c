@@ -11,6 +11,9 @@ Cell temp_root;
 
 Cell* frame_push_in(Cell* pkg, Cell* def)
 {
+    if(IS_TYPE(((Cell*)def->car)->tag, TAG_TYPE_SYMBOL) && symbol_is_keyword(def->car)) 
+        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: can't define a keyword"));
+
     Cell* new_entry = memory_alloc_cons(def, pkg->cdr);
     pkg->cdr = new_entry;
     return new_entry;
@@ -100,6 +103,9 @@ Cell* frame_free_package(Cell* pkg)
 
 Cell* frame_find_def_in(Cell* pkg, Cell* name)
 {
+    if(symbol_is_keyword(name)) 
+        return memory_alloc_cons(name, name);
+
     Cell* walker = pkg->cdr;
     while(!IS_NIL(walker))
     {
@@ -130,6 +136,9 @@ Cell* frame_find_defn_in(Cell* pkg, char* name)
 
 Cell* frame_find_def_from(Cell* pkg, Cell* name)
 {
+    if(symbol_is_keyword(name)) 
+        return memory_alloc_cons(name, name);
+
     Cell* walker = pkg->cdr;
     while(!IS_NIL(walker))
     {
@@ -203,15 +212,15 @@ Cell* frame_init()
 {
     // Must build the system.
     env_root.tag = TAG_MAGIC | TAG_TYPE_CONS;
-    env_root.car = memory_alloc_symbol("*root*");
+    env_root.car = memory_alloc_symbol(":root");
     env_root.cdr = NIL;
 
     env_top.tag = TAG_MAGIC | TAG_TYPE_CONS;
-    env_top.car = memory_alloc_symbol("*top*");
+    env_top.car = memory_alloc_symbol(":top");
     env_top.cdr = &env_root;
     
     temp_root.tag = TAG_MAGIC | TAG_TYPE_CONS;
-    temp_root.car = memory_alloc_symbol("*temp*");
+    temp_root.car = memory_alloc_symbol(":temp");
     temp_root.cdr = NIL;
 
     return &env_top;

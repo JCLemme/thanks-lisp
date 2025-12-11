@@ -82,6 +82,11 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
     {
         if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
         {
+            // An optimization. (I couldn't help myself.)
+            // frame_find_def will alloc a cell to fake a keyword definition.
+            // If we catch them here, we avoid an unnecessary alloc.
+            if(symbol_is_keyword(target)) { return target; }
+
             // Look it up first
             Cell* found = frame_find_def(target); // sus 
             // TODO: no fucking exceptions!!!
@@ -125,6 +130,13 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
         // Process and extract the function to run.
         func = _evaluate_sexp(func); 
         if(IS_TYPE(func->tag, TAG_TYPE_EXCEPTION)) { return func; }
+
+        // Dup check, so we error out before evaluating the arglist.
+        // TODO: refactor
+        if(!IS_TYPE(func->tag, TAG_TYPE_BUILTIN) && !IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
+        {
+            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function"));
+        }
 
         if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY))
         {

@@ -37,17 +37,18 @@ Not much of it mind you.
 * macros: `(macro)` `(macroexpand)`
 * io: `(open)` `(close)` `([py]print-to)` `(stderr)` `(pyprint)`
 
-Most of these work like they would in Common Lisp. Some notes however:
+Most of these work like they would in Common Lisp[^2]. Some notes however:
 
-* `(pyprint)` is a poor man's `(format)` - it prints all of its arguments on a single line, and doesn't print quotation marks around strings. (Like Python's `print` which accepts w/e)
+* `(pyprint)` is a poor man's `(format)` - it prints all of its arguments on a single line, and doesn't print quotation marks around lone strings. (Like Python's `print` which accepts w/e)
  ```
 * (pyprint '(1 2 3) " is a list with car " (car '(1 2 3)) " and cdr " (cdr '(1 2 3)))
 (1 2 3) is a list with car 1 and cdr (2 3) 
  ```
-* `([py]print-to)` expects a stream [from `(open)`] as their first arguments. `(stderr)` returns a stream for... well.
+* `([py]print-to)` expect a stream [from `(open)`] as their first arguments. `(stderr)` returns a stream for... well.
 * `(macro)` works like `(lambda)` except it generates a macro expression. No backtick yet so have fun using it.
 * **All numbers are secretly doubles.**
 
 ---
  
 [^1]: Actually I did once. It was written in Python and it used Python lists instead of conses to build Lisp lists. Let's pretend I didn't
+[^2]: Read: strictly worse than they do in CL. 

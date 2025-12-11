@@ -9,4 +9,27 @@ Now speaking to the lisp listener.
 * 1
 * Exception (type 3) in eval: not a function
 * Exception (type 3) in add: not a number
-* * main: used 194/4096 cells
+* 7
+* 7
+* (1 2 3 4 5 6 . 7)
+* (1 2 3) is a list with car 1 and cdr (2 3)
+()
+* 0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+()
+* Exception (type 3) in eval: symbol 'i' undefined
+* Exception (type 3) in eval: symbol 'j' undefined
+* 210
+()
+* Exception (type 3) in eval: symbol 'i' undefined
+* Exception (type 3) in eval: symbol 'j' undefined
+* 703
+* main: used 706/409600 cells (0%)

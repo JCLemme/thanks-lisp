@@ -15,7 +15,71 @@
 #  define D(x)
 #endif
 
-#define CELL_AREA 40960
+#if defined(USE_READLINE)
+#include <readline/readline.h>
+#include <readline/history.h>
+#elif defined(USE_SHIM)
+#include "shim.h"
+#endif
+
+#if defined(USE_READLINE) || defined(USE_SHIM)
+char* last_line = NULL;
+
+char* thanks_gets(char* prompt)
+{
+    if(last_line) { free(last_line); }
+    last_line = readline(prompt);
+
+    if(last_line && *last_line) { add_history(last_line); }
+
+    return last_line;
+}
+
+#define HIST_FILE "./.thanks_history"
+
+void history_saver()
+{
+    write_history(HIST_FILE);
+    exit(0);
+}
+
+#else
+
+char replin[2048];
+
+char* thanks_gets(char* prompt)
+{
+    printf("%s", prompt);
+    fflush(stdout);
+
+    int idx = 0;
+    int next = 0;
+
+    while(idx < sizeof(replin))
+    {
+        next = getchar();
+        if(next == EOF)
+        {
+            return NULL;
+            break;
+        }
+        else if(next == '\n')
+        {
+            break;
+        }
+        else
+        {
+            replin[idx++] = next; 
+        }
+    }
+    replin[idx] = '\0';
+        
+    return replin;
+}
+
+#endif
+
+#define CELL_AREA 409600
 
 static char errorzone[256];
 
@@ -247,8 +311,11 @@ Cell* fn_macro(Cell* args)
 // ----------------------------------------------
 
 // Reader operations.
-char replin[2048];
 
+// TODO: SCREAMING
+#if defined(USE_READLINE) || defined(USE_SHIM)
+char replin[] = "(print \"don't use me\")";
+#endif
 
 Cell* fn_read(Cell* args)
 {
@@ -284,35 +351,36 @@ Cell* fn_eql(Cell* args)
     // However, "eql" is a value comparison - do these objects mean the same thing?
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
-    return (a->car == b->car) ? T : NIL;
+    return (a->data == b->data) ? T : NIL;
 }
 
+// TODO: the below functions compared against "car", which somehow worked on macos but failed in emscripten. why?
 Cell* fn_gt(Cell* args)
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
-    return (a->car > b->car) ? T : NIL;
+    return (a->num > b->num) ? T : NIL;
 }
 
 Cell* fn_gteq(Cell* args)
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
-    return (a->car >= b->car) ? T : NIL;
+    return (a->num >= b->num) ? T : NIL;
 }
 
 Cell* fn_lt(Cell* args)
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
-    return (a->car < b->car) ? T : NIL;
+    return (a->num < b->num) ? T : NIL;
 }
 
 Cell* fn_lteq(Cell* args)
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
-    return (a->car <= b->car) ? T : NIL;
+    return (a->num <= b->num) ? T : NIL;
 }
 
 Cell* fn_numeq(Cell* args)
@@ -487,6 +555,38 @@ Cell* fn_let(Cell* args)
     return result;
 }
 
+Cell* fn_nlet(Cell* args)
+{
+    Cell* variables = memory_nth(args, 0)->car;
+    Cell* form = memory_nth(args, 1)->car;
+    int expected = 0;
+
+    while(!IS_NIL(variables))
+    {
+        Cell* varlist = variables->car;
+        Cell* sym = memory_nth(varlist, 0)->car;
+        Cell* val = memory_nth(varlist, 1)->car;
+
+        Cell* bound = frame_push_def_in(&env_top, sym, sym)->car;
+        expected++;
+
+        val = _evaluate_sexp(val);
+        if(IS_TYPE(val->tag, TAG_TYPE_EXCEPTION))
+        {
+            frame_pop_in(&env_top, expected);
+            return val;
+        }
+
+        bound->cdr = val;
+        variables = variables->cdr;
+    }
+
+    Cell* result = _evaluate_sexp(form);
+
+    frame_pop_in(&env_top, expected);
+    return result;
+}
+
 Cell* fn_macroexpand(Cell* args)
 {
     return _macroexpand(args->car);
@@ -594,6 +694,7 @@ Cell* fn_close(Cell* args)
 {
     Cell* stream = args->car;
     fclose(stream->car);
+    stream->car = NIL;
     return NIL;
 }
 
@@ -648,6 +749,32 @@ Cell* fn_env_root(Cell* args)
     return &env_root;
 }
 
+Cell* fn_apply(Cell* args)
+{
+    Cell* func = memory_nth(args, 0)->car;
+    Cell* data = memory_nth(args, 1)->car;
+    Cell* results = memory_alloc_cons(NIL, NIL);
+
+    Cell* call = memory_alloc_cons(func, memory_alloc_cons(NIL, NIL));
+    
+    while(!IS_NIL(data))
+    {
+        Cell* tmparg = data->car;
+        ((Cell*)call->cdr)->car = tmparg;
+
+        Cell* tmpres = _evaluate_sexp(call);
+        if(IS_TYPE(tmpres->tag, TAG_TYPE_EXCEPTION)) { return tmpres; }
+
+        results->car = tmpres;
+        results->cdr = memory_alloc_cons(NIL, NIL);
+        results = results->cdr;
+
+        data = data->cdr;
+    }
+
+    return results;
+}
+
 // -- -- -- -- --
 
 int main(int argc, char** argv) 
@@ -660,6 +787,7 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "t", T);
     frame_push_defn_in(&env_root, "nil", NIL);
     frame_push_defn_in(&env_root, "def", memory_alloc_builtin(fn_def, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "ldef", memory_alloc_builtin(fn_ldef, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "car", memory_alloc_builtin(fn_car, 0)); 
     frame_push_defn_in(&env_root, "cdr", memory_alloc_builtin(fn_cdr, 0)); 
     frame_push_defn_in(&env_root, "list", memory_alloc_builtin(fn_list, 0));
@@ -690,6 +818,7 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "tagbody", memory_alloc_builtin(fn_tagbody, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "setq", memory_alloc_builtin(fn_setq, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "let", memory_alloc_builtin(fn_let, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "nlet", memory_alloc_builtin(fn_nlet, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macroexpand", memory_alloc_builtin(fn_macroexpand, 0));
     frame_push_defn_in(&env_root, "garbage", memory_alloc_builtin(fn_garbage, 0));
     frame_push_defn_in(&env_root, "pyprint", memory_alloc_builtin(fn_pyprint, 0));
@@ -699,11 +828,14 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "when", memory_alloc_builtin(fn_when, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "open", memory_alloc_builtin(fn_open, 0));
     frame_push_defn_in(&env_root, "close", memory_alloc_builtin(fn_close, 0));
-    frame_push_defn_in(&env_root, "stderr", memory_alloc_builtin(fn_stderr, 0));
     frame_push_defn_in(&env_root, "print-to", memory_alloc_builtin(fn_print_to, 0));
-    //frame_push_defn_in(&env_root, "pyprint-to", memory_alloc_builtin(fn_pyprint_to, 0));
+    frame_push_defn_in(&env_root, "pyprint-to", memory_alloc_builtin(fn_pyprint_to, 0));
     frame_push_defn_in(&env_root, "env-root", memory_alloc_builtin(fn_env_root, 0));
-    
+    frame_push_defn_in(&env_root, "apply", memory_alloc_builtin(fn_apply, 0));
+   
+    frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
+    // env-root should be a variable too, but printing it causes an infinite loop, so.
+
     // And do some legwork.
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
     _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
@@ -722,51 +854,47 @@ int main(int argc, char** argv)
     memory_add_root(&temp_root);
     memory_add_root(sym_top);
 
+    // Set up some handlers.
+#ifdef USE_READLINE
+    using_history();
+    signal(SIGINT, history_saver);
+    read_history(HIST_FILE);
+
+    rl_variable_bind("blink-matching-paren", "on");
+    rl_variable_bind("history-size", "300");
+    rl_initialize();
+    rl_bind_key ('\t', rl_insert);
+#endif
+
     printf("Thanks lisp v2\n");
     printf("Now speaking to the lisp listener.\n");
     
-    bool running = true;
-    Cell* todo;
-
-    while(running)
+    while(1)
     {
-        int idx = 0;
-        int next = 0;
-
-        printf("* ");
-
-        while(idx < sizeof(replin))
-        {
-            next = getchar();
-            if(next == EOF)
-            {
-                running = false;
-                break;
-            }
-            else if(next == '\n')
-            {
-                break;
-            }
-            else
-            {
-                replin[idx++] = next; 
-            }
-        }
-        replin[idx] = '\0';
+        char* line_to_do = thanks_gets("* ");
         
-        if(replin[0] != '\0')
+        if(line_to_do == NULL) { break; }
+
+        if(*line_to_do)
         {
-            todo = fn_read(NULL);
-            memory_add_root(todo);
+            Cell* cell_to_do = _parse_sexps(line_to_do);
+            memory_add_root(cell_to_do);
+
             D(printf("---\n"));
-            Cell* res = _evaluate_sexp(todo);
+
+            Cell* res = _evaluate_sexp(cell_to_do);
             _print_sexps(res);
             printf("\n");
-            memory_del_root(todo);
+
+            memory_del_root(cell_to_do);
         }
     }
 
-    printf("main: used %d/%d cells (%d%%)\n", memory_get_used(), CELL_AREA, (memory_get_used() / CELL_AREA) * 100);
+    printf("\nmain: used %d/%d cells (%d%%)\n", memory_get_used(), CELL_AREA, (memory_get_used() / CELL_AREA) * 100);
+
+#ifdef USE_READLINE
+    write_history(HIST_FILE);
+#endif
 
     return 0;
 }

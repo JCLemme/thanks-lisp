@@ -118,6 +118,7 @@ bool symbol_eql(Cell* one, Cell* two);
 bool string_eql(Cell* one, Cell* two);
 char* symbol_string_ptr(Cell* sym);
 char* string_ptr(Cell* str);
+bool symbol_is_keyword(Cell* sym);
 
 // ---
 

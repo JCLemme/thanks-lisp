@@ -102,6 +102,8 @@ Cell* _recurse_sexps(char* buffer, int* index)
                     scratch[scridx++] = '"';
                 else if(c == '\\')
                     scratch[scridx++] = '\\';
+                else if(c == 'x')
+                    scratch[scridx++] = '\x1b';
                 else
                     scratch[scridx++] = '!';
             }
