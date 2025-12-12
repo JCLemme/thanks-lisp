@@ -12,6 +12,7 @@ int _lambda_list_define_all(Cell* env, Cell* list, Cell* args)
 
     while(!IS_NIL(list))
     {
+        //printf("pushing %s as type %d %p\n", symbol_string_ptr(list->car), ((Cell*)args->car)->tag, args->car);
         frame_push_def_in(env, list->car, args->car);
         expected++;
         list = list->cdr;
@@ -30,13 +31,23 @@ bool _is_macro_expr(Cell* list)
     return true;
 }
 
-Cell* _hardlinker(Cell* target)
+Cell* _hardlinker(Cell* target, Cell* lambs)
 {
     // Recurse, replacing references to objects in the lexical environment with links thereto.
     if(!IS_TYPE(target->tag, TAG_TYPE_CONS))
     {
         if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
         {
+            // Don't bind to anything that's in the lambda list.
+            Cell* ltmp = lambs;
+            while(!IS_NIL(ltmp))
+            {
+                //if(symbol_string_ptr(ltmp->car) == symbol_string_ptr(target))
+                //    return target;
+
+                ltmp = ltmp->cdr;
+            }
+
             // Symbol definitions are sus. Note that "find_def_in" will only look within the 
             // top level of the environment, i.e. lexical definitions only.
             Cell* found_def = frame_find_def_in(&env_top, target); 
@@ -47,7 +58,9 @@ Cell* _hardlinker(Cell* target)
                 return target; // Must be a global - ignore it.
             }
             else
+            {
                 return memory_alloc_hardlink(found_def); // Got you motherfucker
+            }
         }
         else
         {
@@ -61,7 +74,7 @@ Cell* _hardlinker(Cell* target)
         Cell* todo = target;
         while(!IS_NIL(todo))
         {
-            todo->car = _hardlinker(todo->car);
+            todo->car = _hardlinker(todo->car, lambs);
             todo = todo->cdr;
         }
 
@@ -102,7 +115,7 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
         }
         else if(IS_TYPE(target->tag, TAG_TYPE_HARDLINK))
         {
-            // Hardlink - it's storing a reference to the atom we want. 
+            // Hardlink - it's storing a reference to the atom we want.
             // Specifically, a reference to the *definition* for the atom we want.
             Cell* linked_def = target->car;
             return linked_def->cdr;
@@ -135,7 +148,10 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
         // TODO: refactor
         if(!IS_TYPE(func->tag, TAG_TYPE_BUILTIN) && !IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
         {
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function"));
+            char panic[256];
+            _print_sexps_to(panic, sizeof(panic), func);
+            snprintf(errorzone, sizeof(errorzone), "eval: '%s' not a function", panic);
+            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string(errorzone));
         }
 
         if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY))

@@ -26,7 +26,7 @@ void _print_sexps_to_file(FILE* dest, Cell* target);
 
 int _lambda_list_define_all(Cell* env, Cell* list, Cell* args);
 bool _is_macro_expr(Cell* list);
-Cell* _hardlinker(Cell* target);
+Cell* _hardlinker(Cell* target, Cell* lambs);
 Cell* _evaluate_sexp(Cell* target);
 Cell* _macroexpand_one(Cell* expr);
 Cell* _macroexpand(Cell* expr);

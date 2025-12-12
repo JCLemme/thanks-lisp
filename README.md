@@ -8,7 +8,7 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 * Garbage collection
 * Tagbodies
 * Lexical scoping
-* Closures
+* Closures (it's a [MAN](https://en.wikipedia.org/wiki/Man_or_boy_test) baby)
 * Macros
 * File I/O
 * Usually doesn't segfault
@@ -46,9 +46,11 @@ Most of these work like they would in Common Lisp[^2]. Some notes however:
  ```
 * `([py]print-to)` expect a stream [from `(open)`] as their first arguments. `(stderr)` returns a stream for... well.
 * `(macro)` works like `(lambda)` except it generates a macro expression. No backtick yet so have fun using it.
+* Other than byte arrays (e.g. strings), all the interpreter's data structures are built from Lisp cells. This lets you do fun things like `(apply print (env-root))` which prints all definitions in the environment[^3].
 * **All numbers are secretly doubles.**
 
 ---
  
 [^1]: Actually I did once. It was written in Python and it used Python lists instead of conses to build Lisp lists. Let's pretend I didn't
 [^2]: Read: strictly worse than they do in CL. 
+[^3]: I don't know how rare this is, but it tickles me, so.

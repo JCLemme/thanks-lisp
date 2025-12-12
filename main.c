@@ -291,11 +291,12 @@ Cell* fn_lambda(Cell* args)
     Cell* arglist = args->car;
     Cell* oplist = ((Cell*)(args->cdr))->car;
     // TODO: make sure the arglist is only symbols
-    Cell* result = memory_alloc_lambda(arglist, oplist, 0);            
+    Cell* result = memory_alloc_lambda(arglist, NIL, 0);            
 
     // Closure conversion: capture anything from the lexical environment that we need
-    result->cdr = _hardlinker(result->cdr);
-
+    Cell* modlist = memory_deep_copy(oplist);
+    result->cdr = _hardlinker(modlist, arglist);
+    
     return result;
 }
 
@@ -571,6 +572,7 @@ Cell* fn_nlet(Cell* args)
         expected++;
 
         val = _evaluate_sexp(val);
+
         if(IS_TYPE(val->tag, TAG_TYPE_EXCEPTION))
         {
             frame_pop_in(&env_top, expected);
@@ -775,6 +777,20 @@ Cell* fn_apply(Cell* args)
     return results;
 }
 
+Cell* fn_zelda(Cell* args)
+{
+    Cell* arg = args->car;
+    
+    if(IS_TYPE(arg->tag, TAG_TYPE_HARDLINK))
+    {
+        return frame_find_def_in(&env_top, arg->car);
+    }
+    else
+    {
+        return arg;
+    }
+}
+
 // -- -- -- -- --
 
 int main(int argc, char** argv) 
@@ -832,6 +848,7 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "pyprint-to", memory_alloc_builtin(fn_pyprint_to, 0));
     frame_push_defn_in(&env_root, "env-root", memory_alloc_builtin(fn_env_root, 0));
     frame_push_defn_in(&env_root, "apply", memory_alloc_builtin(fn_apply, 0));
+    frame_push_defn_in(&env_root, "zelda", memory_alloc_builtin(fn_zelda, 0));
    
     frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
     // env-root should be a variable too, but printing it causes an infinite loop, so.

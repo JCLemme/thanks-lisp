@@ -85,7 +85,10 @@ int memory_get_used();
 
 Cell* memory_nth(Cell* begin, int place);
 int memory_length(Cell* begin);
+
+Cell* memory_single_copy(Cell* src);
 Cell* memory_shallow_copy(Cell* begin);
+Cell* memory_deep_copy(Cell* begin);
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr);
 

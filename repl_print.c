@@ -119,8 +119,11 @@ void _print_sexps_internal(write_callback_t writer, Cell* target, void* state)
     }
     else if(IS_TYPE(target->tag, TAG_TYPE_HARDLINK))
     {
+        Cell* trapped = target->car;
+
         writer("[->", -1, state);
-        _print_sexps_internal(writer, target->car, state);
+        _print_sexps_internal(writer, trapped->car, state);
+        printf(" %p", target->car);
         writer("]", -1, state);
     }
     else

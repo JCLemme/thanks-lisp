@@ -69,6 +69,13 @@ int memory_length(Cell* begin)
     return 1 + memory_length(begin->cdr);
 }
 
+Cell* memory_single_copy(Cell* src)
+{
+    Cell* newc = memory_alloc_cons(src->car, src->cdr);
+    newc->tag = src->tag;
+    return newc;
+}
+
 Cell* memory_shallow_copy(Cell* begin)
 {
     if(IS_NIL(begin)) { return NIL; }
@@ -85,6 +92,33 @@ Cell* memory_shallow_copy(Cell* begin)
 
     return save;
 }
+
+Cell* memory_deep_copy(Cell* begin)
+{
+    if(IS_NIL(begin)) { return NIL; }
+
+    if(IS_TYPE(begin->tag, TAG_TYPE_CONS))
+    {
+        Cell* copy = memory_alloc_cons(NIL, NIL);
+        Cell* save = copy;
+
+        while(!IS_NIL(begin))
+        {
+            copy->car = memory_deep_copy(begin->car);
+            copy->cdr = memory_alloc_cons(NIL, NIL);
+            copy = copy->cdr;
+            begin = begin->cdr;
+        }
+
+        return save;
+    }
+    else
+    {
+        return memory_single_copy(begin);
+    }
+}
+
+
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr)
 {
