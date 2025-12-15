@@ -123,7 +123,6 @@ void _print_sexps_internal(write_callback_t writer, Cell* target, void* state)
 
         writer("[->", -1, state);
         _print_sexps_internal(writer, trapped->car, state);
-        printf(" %p", target->car);
         writer("]", -1, state);
     }
     else

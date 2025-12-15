@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "memory.h"
 #include "frame.h"
@@ -24,13 +25,15 @@
 
 #if defined(USE_READLINE) || defined(USE_SHIM)
 char* last_line = NULL;
+bool save_history = true;
+bool executing = false;
 
 char* thanks_gets(char* prompt)
 {
     if(last_line) { free(last_line); }
     last_line = readline(prompt);
 
-    if(last_line && *last_line) { add_history(last_line); }
+    if(last_line && *last_line && save_history) { add_history(last_line); }
 
     return last_line;
 }
@@ -39,8 +42,15 @@ char* thanks_gets(char* prompt)
 
 void history_saver()
 {
-    write_history(HIST_FILE);
-    exit(0);
+    if(executing)
+    {
+        got_interrupt = true;
+    }
+    else
+    {
+        write_history(HIST_FILE);
+        exit(0);
+    }
 }
 
 #else
@@ -105,7 +115,7 @@ Cell* fn_car(Cell* args)
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
         _print_sexps(first);
-        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'"));
+        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'", -1));
     }
 
     return first->car;
@@ -120,7 +130,7 @@ Cell* fn_cdr(Cell* args)
     Cell* first = args->car;
     if(!IS_TYPE(first->tag, TAG_TYPE_CONS))
     {
-        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'"));
+        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("car: argument not of type 'list'", -1));
     }
 
     return first->cdr;
@@ -182,6 +192,43 @@ Cell* fn_append(Cell* args)
     return save;
 }
 
+Cell* fn_rplaca(Cell* args)
+{
+    Cell* target = memory_nth(args, 0)->car;
+    Cell* insert = memory_nth(args, 1)->car;
+    target->car = insert;
+    return target;
+}
+
+Cell* fn_rplacd(Cell* args)
+{
+    Cell* target = memory_nth(args, 0)->car;
+    Cell* insert = memory_nth(args, 1)->car;
+    target->cdr = insert;
+    return target;
+}
+
+Cell* fn_nconc(Cell* args)
+{
+    // Trying something different.
+    // (Bad)
+    int len = memory_length(args);
+
+    if(len == 0) { return NIL; }
+    if(len == 1) { return args->car; }
+    Cell* save = args->car;
+
+    for(int i = 0; i < len - 1; i++)
+    {
+        Cell* sublist = memory_nth(args, i)->car;
+        Cell* taillist = memory_nth(args, i+1)->car;
+        int sublen = memory_length(sublist);
+        memory_nth(sublist, sublen - 1)->cdr = taillist;
+    }
+
+    return save;
+}
+
 Cell* fn_null(Cell* args)
 {
     // TODO: nearly time to flip case
@@ -197,7 +244,7 @@ Cell* fn_add(Cell* args)
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("add: not a number"));
+            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("add: not a number", -1));
         }
         acc += arg->num;
         args = args->cdr;
@@ -210,27 +257,37 @@ Cell* fn_sub(Cell* args)
 {
     double acc = 0;
     bool first = true;
-    while(!IS_NIL(args))
+    int argc = memory_length(args);
+
+    if(argc == 1)
     {
         Cell* arg = args->car;
-        if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
-        {
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("sub: not a number"));
-        }
-        if(first)
-        {
-            acc = arg->num;
-            first = false;
-        }
-        else
-        {
-            acc -= arg->num;
-        }
-
-        args = args->cdr;
+        return memory_alloc_number(arg->num * -1);
     }
+    else
+    {
+        while(!IS_NIL(args))
+        {
+            Cell* arg = args->car;
+            if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
+            {
+                return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("sub: not a number", -1));
+            }
+            if(first)
+            {
+                acc = arg->num;
+                first = false;
+            }
+            else
+            {
+                acc -= arg->num;
+            }
 
-    return memory_alloc_number(acc);
+            args = args->cdr;
+        }
+
+        return memory_alloc_number(acc);
+    }
 }
 
 Cell* fn_mul(Cell* args)
@@ -241,7 +298,7 @@ Cell* fn_mul(Cell* args)
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("mul: not a number"));
+            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("mul: not a number", -1));
         }
         acc *= arg->num;
         args = args->cdr;
@@ -259,7 +316,7 @@ Cell* fn_div(Cell* args)
         Cell* arg = args->car;
         if(!IS_TYPE(arg->tag, TAG_TYPE_NUMBER))
         {
-            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("div: not a number"));
+            return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("div: not a number", -1));
         }
         if(first)
         {
@@ -309,20 +366,17 @@ Cell* fn_macro(Cell* args)
     return memory_alloc_lambda(arglist, oplist, TAG_SPEC_FUNLAZY | TAG_SPEC_FUNMACRO); // TODO: use case for splitting? or at least not implying lazy
 }
 
-// ----------------------------------------------
-
-// Reader operations.
-
-// TODO: SCREAMING
-#if defined(USE_READLINE) || defined(USE_SHIM)
-char replin[] = "(print \"don't use me\")";
-#endif
+Cell* fn_collect(Cell* args)
+{
+    char* got = thanks_gets("");
+    Cell* made = memory_alloc_string(got, -1);
+    // Note that _gets frees the string for us.
+    return made;
+}
 
 Cell* fn_read(Cell* args)
 {
-    // TODO: merge with above?
-    int idx = 0;
-    return _recurse_sexps(replin, &idx);
+    return _parse_sexps(string_ptr(args->car));
 }
 
 Cell* fn_print(Cell* args)
@@ -332,7 +386,6 @@ Cell* fn_print(Cell* args)
     printf("\n");
     return arg;
 }
-
 
 Cell* fn_eval(Cell* args)
 {
@@ -427,7 +480,7 @@ Cell* fn_go(Cell* args)
     Cell* target = args->car;
     if(!IS_TYPE(target->tag, TAG_TYPE_SYMBOL)) 
     {
-        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("go: label wasn't a symbol"));
+        return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("go: label wasn't a symbol", -1));
     }
     else
     {
@@ -488,7 +541,7 @@ Cell* fn_tagbody(Cell* args)
 
     if(hunting_for != NULL)
     {
-        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("tagbody: label not found"));
+        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("tagbody: label not found", -1));
     }
     else
     {
@@ -619,6 +672,7 @@ Cell* fn_pyprint(Cell* args)
             _print_sexps(next);
         }
 
+        printf(" ");
         args = args->cdr;
     }
 
@@ -687,7 +741,7 @@ Cell* fn_open(Cell* args)
     // pain
     FILE* file = fopen(string_ptr(filename), symbol_string_ptr(mode)+1);
     if(file == NULL)
-        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("open: error opening file"));
+        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("open: error opening file", -1));
 
     return memory_alloc_stream((void*)file);
 }
@@ -751,7 +805,7 @@ Cell* fn_env_root(Cell* args)
     return &env_root;
 }
 
-Cell* fn_apply(Cell* args)
+Cell* fn_map(Cell* args)
 {
     Cell* func = memory_nth(args, 0)->car;
     Cell* data = memory_nth(args, 1)->car;
@@ -777,18 +831,86 @@ Cell* fn_apply(Cell* args)
     return results;
 }
 
-Cell* fn_zelda(Cell* args)
+Cell* fn_typep(Cell* args)
 {
-    Cell* arg = args->car;
-    
-    if(IS_TYPE(arg->tag, TAG_TYPE_HARDLINK))
+    Cell* type = memory_nth(args, 0)->car;
+    Cell* target = memory_nth(args, 1)->car;
+
+    if(symbol_matches(type, ":cons")) { return (IS_TYPE(target->tag, TAG_TYPE_CONS)) ? T : NIL; }
+    else if(symbol_matches(type, ":number")) { return (IS_TYPE(target->tag, TAG_TYPE_NUMBER)) ? T : NIL; }
+    else if(symbol_matches(type, ":lambda")) { return (IS_TYPE(target->tag, TAG_TYPE_LAMBDA)) ? T : NIL; }
+    else if(symbol_matches(type, ":symbol")) { return (IS_TYPE(target->tag, TAG_TYPE_SYMBOL)) ? T : NIL; }
+    else if(symbol_matches(type, ":array")) { return (IS_TYPE(target->tag, TAG_TYPE_ARRAY)) ? T : NIL; }
+    else if(symbol_matches(type, ":builtin")) { return (IS_TYPE(target->tag, TAG_TYPE_BUILTIN)) ? T : NIL; }
+    else if(symbol_matches(type, ":hardlink")) { return (IS_TYPE(target->tag, TAG_TYPE_HARDLINK)) ? T : NIL; }
+    else if(symbol_matches(type, ":exception")) { return (IS_TYPE(target->tag, TAG_TYPE_EXCEPTION)) ? T : NIL; }
+    else if(symbol_matches(type, ":stream")) { return (IS_TYPE(target->tag, TAG_TYPE_STREAM)) ? T : NIL; }
+    else if(symbol_matches(type, ":string")) { return (IS_TYPE(target->tag, TAG_TYPE_STRING) || IS_TYPE(target->tag, TAG_TYPE_PSTRING)) ? T : NIL; }
+    else { return NIL; }
+}
+
+Cell* _do_backquote(Cell* target)
+{
+    if(IS_TYPE(target->tag, TAG_TYPE_CONS))
     {
-        return frame_find_def_in(&env_top, arg->car);
+        // We have one special case: if it's a comma-form [i.e. (comma ...)], let it eval.
+        // Note that this function checks for type internally - non-symbols will gracefully fail out.
+        if(symbol_matches(target->car, "comma"))
+        {
+            return _evaluate_sexp(target);
+        }
+        else
+        {
+            Cell* built = NIL;
+            Cell* saved = NIL;
+
+            while(!IS_NIL(target))
+            {
+                // TODO: ,@ and ,. (append and nconc)
+                built = memory_extend(built);
+                built->car = NIL;
+                if(IS_NIL(saved)) 
+                { 
+                    saved = built; 
+                    frame_push_in(&temp_root, saved);
+                }
+
+                built->car = _do_backquote(target->car);
+
+                target = target->cdr;
+            }
+            
+            if(!IS_NIL(saved)) { frame_pop_in(&temp_root, 1); }
+            return saved;
+        }
     }
     else
     {
-        return arg;
+        // If it's not a list, act like it's (quote) and do nothing.
+        return target;
     }
+}
+
+Cell* fn_backquote(Cell* args)
+{
+    // Opposite-eval: return quoted forms *except* when asked not to.
+    return _do_backquote(args->car);
+}
+
+Cell* fn_comma(Cell* args)
+{
+    // Do nothing.
+    return args->car;
+}
+
+Cell* fn_time(Cell* args)
+{
+    clock_t start = clock();
+    Cell* result = _evaluate_sexp(args->car);
+    clock_t stop = clock() - start;
+    double len = 1000.0 * stop / CLOCKS_PER_SEC;
+    printf("time: %fms\n", len);
+    return result;
 }
 
 // -- -- -- -- --
@@ -810,6 +932,9 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "quote", memory_alloc_builtin(fn_quote, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "cons", memory_alloc_builtin(fn_cons, 0));
     frame_push_defn_in(&env_root, "append", memory_alloc_builtin(fn_append, 0));
+    frame_push_defn_in(&env_root, "rplaca", memory_alloc_builtin(fn_rplaca, 0));
+    frame_push_defn_in(&env_root, "rplacd", memory_alloc_builtin(fn_rplacd, 0));
+    frame_push_defn_in(&env_root, "nconc", memory_alloc_builtin(fn_nconc, 0));
     frame_push_defn_in(&env_root, "null", memory_alloc_builtin(fn_null, 0));
     frame_push_defn_in(&env_root, "+", memory_alloc_builtin(fn_add, 0));
     frame_push_defn_in(&env_root, "-", memory_alloc_builtin(fn_sub, 0));
@@ -819,6 +944,7 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "lambda", memory_alloc_builtin(fn_lambda, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macro", memory_alloc_builtin(fn_macro, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "read", memory_alloc_builtin(fn_read, 0));
+    frame_push_defn_in(&env_root, "collect", memory_alloc_builtin(fn_collect, 0));
     frame_push_defn_in(&env_root, "print", memory_alloc_builtin(fn_print, 0));
     frame_push_defn_in(&env_root, "eval", memory_alloc_builtin(fn_eval, 0));
     frame_push_defn_in(&env_root, "eq", memory_alloc_builtin(fn_eq, 0));
@@ -847,16 +973,23 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "print-to", memory_alloc_builtin(fn_print_to, 0));
     frame_push_defn_in(&env_root, "pyprint-to", memory_alloc_builtin(fn_pyprint_to, 0));
     frame_push_defn_in(&env_root, "env-root", memory_alloc_builtin(fn_env_root, 0));
-    frame_push_defn_in(&env_root, "apply", memory_alloc_builtin(fn_apply, 0));
-    frame_push_defn_in(&env_root, "zelda", memory_alloc_builtin(fn_zelda, 0));
+    frame_push_defn_in(&env_root, "map", memory_alloc_builtin(fn_map, 0));
+    frame_push_defn_in(&env_root, "typep", memory_alloc_builtin(fn_typep, 0));
+    frame_push_defn_in(&env_root, "backquote", memory_alloc_builtin(fn_backquote, TAG_SPEC_FUNLAZY));
+    frame_push_defn_in(&env_root, "comma", memory_alloc_builtin(fn_comma, 0));
+    frame_push_defn_in(&env_root, "time", memory_alloc_builtin(fn_time, TAG_SPEC_FUNLAZY));
    
     frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
     // env-root should be a variable too, but printing it causes an infinite loop, so.
 
     // And do some legwork.
-    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
-    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
-    
+    //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
+    //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (backquote (cond ((comma cd) (comma ys)) (t (comma no)))) ))"));
+    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) `(cond (,cd ,ys) (t ,no)) ))"));
+
+    //_evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
+    _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) `(let ((i 0)) (tagbody g_loop ,bd (setq i (+ i 1)) (cond ((< i ,ct) (go g_loop))))) ))"));
+
     _evaluate_sexp(_parse_sexps("(def plusp (lambda (qu) (> qu 0)))"));
     _evaluate_sexp(_parse_sexps("(def first (lambda (qu) (car qu)))"));
     _evaluate_sexp(_parse_sexps("(def second (lambda (qu) (car (cdr qu))))"));
@@ -888,6 +1021,11 @@ int main(int argc, char** argv)
     
     while(1)
     {
+        got_interrupt = false;
+#ifdef USE_READLINE
+        executing = false;
+#endif
+
         char* line_to_do = thanks_gets("* ");
         
         if(line_to_do == NULL) { break; }
@@ -898,6 +1036,10 @@ int main(int argc, char** argv)
             memory_add_root(cell_to_do);
 
             D(printf("---\n"));
+
+#ifdef USE_READLINE
+            executing = true;
+#endif
 
             Cell* res = _evaluate_sexp(cell_to_do);
             _print_sexps(res);

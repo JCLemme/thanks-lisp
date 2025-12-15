@@ -13,6 +13,8 @@
 #ifndef _REPL_H
 #define _REPL_H
 
+extern bool got_interrupt;
+
 typedef int (*read_callback_t)(void*);
 typedef int (*write_callback_t)(char*, int, void*);
 
@@ -24,7 +26,7 @@ void _print_sexps(Cell* target);
 void _print_sexps_to(char* dest, int size, Cell* target);
 void _print_sexps_to_file(FILE* dest, Cell* target);
 
-int _lambda_list_define_all(Cell* env, Cell* list, Cell* args);
+Cell* _lambda_list_define_all(Cell* env, Cell* list, Cell* args, int* expected);
 bool _is_macro_expr(Cell* list);
 Cell* _hardlinker(Cell* target, Cell* lambs);
 Cell* _evaluate_sexp(Cell* target);

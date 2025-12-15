@@ -2,50 +2,102 @@
 
 char scratch[256];
 
-Cell* _recurse_sexps(char* buffer, int* index)
+bool _skip_whitespace(char* buffer, int* index)
 {
-    // TODO: the readlist
-    Cell* this_object = NULL;
-    char c = buffer[(*index)];
-    int scridx = 0;
+    // Fast-forwards a character stream past whitespace.
+    int found;
 
-    if(c == '\0')
+    while(1)
     {
-        return NULL;
-    }
-    else if(c == '(')
-    {
-        Cell* next_object = NULL;
+        found = buffer[(*index)];
+        if(found == '\0' || found == EOF) { return false; }
+        if(found != ' ' && found != '\t' && found != '\n') { return true; }
         (*index)++;
-        while(buffer[(*index)] == ' ') {(*index)++;}
-        c = buffer[(*index)];
+    }
 
-        while(c != ')')
+    // The compiler recognizes that this function will always return a value... 
+    // ...but imma force it anyway
+    return false;
+}
+
+int _steal_token(char* buffer, int* index)
+{
+    // Grabs a token from the input stream. A token is a collection of 
+    // not-whitespace characters, i.e. symbols.
+    if(!_skip_whitespace(buffer, index)) { return -1; }
+
+    int found;
+    int len = 1;
+    bool in_string = false;
+    bool in_comment = false;
+
+    while(1)
+    {
+        found = buffer[(*index)];
+        if(found == '\0' || found == EOF) { return -1; }
+
+        if(!in_string)
         {
-            if(next_object == NULL)
+            if(!in_comment)
             {
-                next_object = memory_alloc_cons(NIL, NIL);
-                this_object = next_object;
+                if(found == ')') { return len; }
+                if(found == ';') { in_comment = true; }
+                if(found == '"') { in_string = true; }
             }
             else
             {
-                next_object->cdr = memory_alloc_cons(NIL, NIL);
-                next_object = next_object->cdr;
+                if(found == '\n') { in_comment = false; }
             }
+        }
+        else
+        {
+        }
+    }
+
+}
+
+Cell* _recurse_sexps(char* buffer, int* index)
+{
+    // TODO: the readlist
+    if(!_skip_whitespace(buffer, index)) { return NULL; }
+    
+    Cell* this_object = NULL;
+    int c = buffer[(*index)];
+    int scridx = 0;
+
+    if(c == '\0' || c == EOF) // IT'S OVER
+    {
+        return NULL;
+    }
+    else if(c == '(') // IT'S A LIST
+    {
+        Cell* next_object = NIL;
+        this_object = NIL;
+
+        //(*index)++;
+        c = buffer[++(*index)];
+
+        while(c != ')')
+        {
+            next_object = memory_extend(next_object);
+            if(IS_NIL(this_object)) { this_object = next_object; }
 
             next_object->car = _recurse_sexps(buffer, index);
 
-            while(buffer[(*index)] == ' ') {(*index)++;}
-            c = buffer[(*index)];
-        }
+            // Abort if the child failed to convert.
+            if(next_object->car == NULL) { return NULL; }
 
-        // Nil won't set this_object - do it manually
-        if(this_object == NULL) this_object = NIL;
+            if(!_skip_whitespace(buffer, index)) { return NULL; }
+            c = buffer[(*index)];
+
+            // Signal up the tree if this object is malformed
+            if(c == '\0' || c == EOF) { return NULL; }
+        }
 
         // Read off the end
         (*index)++;
     }
-    else if(c == '-' || c == '+' || isdigit(c))
+    else if(c == '-' || c == '+' || isdigit(c)) // IT'S A NUMBER (MAYBE)
     {
         // The cursed logic in this function:
         // * symbols can *also* start with a plus/minus (but not numbers)
@@ -77,9 +129,8 @@ Cell* _recurse_sexps(char* buffer, int* index)
         // TODO: an input of just "+" becomes 0 - I think it's the null terminator detector breaking
         this_object = memory_alloc_number(atof(scratch));
     }
-    else if(c == '"')
+    else if(c == '"') // IT'S A STRING
     {
-        // TODO: ew
         (*index)++;
         c = buffer[*index];
         bool escaped = false;
@@ -89,23 +140,24 @@ Cell* _recurse_sexps(char* buffer, int* index)
         {
             if(escaped)
             {
-                escaped = false;
-                if(c == 'n')
-                    scratch[scridx++] = '\n';
-                else if(c == '0')
-                    scratch[scridx++] = '\0';
-                else if(c == 'r')
-                    scratch[scridx++] = '\r';
-                else if(c == 't')
-                    scratch[scridx++] = '\t';
-                else if(c == '"')
-                    scratch[scridx++] = '"';
-                else if(c == '\\')
-                    scratch[scridx++] = '\\';
-                else if(c == 'x')
-                    scratch[scridx++] = '\x1b';
-                else
-                    scratch[scridx++] = '!';
+                escaped = false; // Is there really no better way to do this?!
+                // TODO: handle codepoint insertion
+                switch(c)
+                {
+                    case('0'):  scratch[scridx++] = '\0';   break;
+                    case('a'):  scratch[scridx++] = '\a';   break;
+                    case('b'):  scratch[scridx++] = '\b';   break;
+                    case('e'):  scratch[scridx++] = '\x1b'; break;
+                    case('f'):  scratch[scridx++] = '\f';   break;
+                    case('n'):  scratch[scridx++] = '\n';   break;
+                    case('r'):  scratch[scridx++] = '\r';   break;
+                    case('t'):  scratch[scridx++] = '\t';   break;
+                    case('v'):  scratch[scridx++] = '\v';   break;
+                    case('\\'): scratch[scridx++] = '\\';   break;
+                    case('\''): scratch[scridx++] = '\'';   break;
+                    case('\"'): scratch[scridx++] = '\"';   break;
+                    default:    scratch[scridx++] = '!';    break;
+                }
             }
             else
             {
@@ -119,18 +171,36 @@ Cell* _recurse_sexps(char* buffer, int* index)
 
             (*index)++;
             c = buffer[*index];
+
+            if(c == '\0' || c == EOF) { return NULL; }
         }
-        while(looking && c != '\0');
+        while(looking);
         scratch[scridx] = '\0';
 
-        this_object = memory_alloc_string(scratch);
+        this_object = memory_alloc_string(scratch, -1);
     }
-    else if(c == '\'')
+    else if(c == '\'') // IT'S QUOTED
     {
         (*index)++;
-        this_object = memory_alloc_cons(memory_alloc_symbol("quote"), memory_alloc_cons(_recurse_sexps(buffer, index), NULL));
+        Cell* subobj = _recurse_sexps(buffer, index);
+        if(subobj == NULL) { return NULL; }
+        this_object = memory_alloc_cons(memory_alloc_symbol("quote"), memory_alloc_cons(subobj, NIL));
     }
-    else
+    else if(c == '`') // IT'S A BACKQUOTE
+    {
+        (*index)++;
+        Cell* subobj = _recurse_sexps(buffer, index);
+        if(subobj == NULL) { return NULL; }
+        this_object = memory_alloc_cons(memory_alloc_symbol("backquote"), memory_alloc_cons(subobj, NIL));
+    }
+    else if(c == ',') // IT'S COMMA'D
+    {
+        (*index)++;
+        Cell* subobj = _recurse_sexps(buffer, index);
+        if(subobj == NULL) { return NULL; }
+        this_object = memory_alloc_cons(memory_alloc_symbol("comma"), memory_alloc_cons(subobj, NIL));
+    }
+    else // IT'S A SYMBOL
     {
 was_symbol_actually:
         do
@@ -151,6 +221,15 @@ was_symbol_actually:
 Cell* _parse_sexps(char* inbuf)
 {
     int idx = 0;
-    return _recurse_sexps(inbuf, &idx);    
+    Cell* made = _recurse_sexps(inbuf, &idx);    
+    
+    if(made == NULL)
+    {
+        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("read: malformed sexps", -1));
+    }
+    else
+    {
+        return made;
+    }
 }
 

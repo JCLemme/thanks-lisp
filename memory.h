@@ -10,7 +10,7 @@
 #define TAG_MAGIC 0 //(0xEAULL << 56)
 #define TAG_MAGIC_MASK (0xFFULL << 56)
 
-#define IS_NIL(cell) (cell == NULL || cell == &nil_cell || (cell->car == NULL && cell->cdr == NULL) || (cell->car == &nil_cell && cell->cdr == &nil_cell))
+#define IS_NIL(cell) (cell == NULL || cell == &nil_cell || (cell->car == NULL && cell->cdr == NULL)) //|| (cell->car == &nil_cell && cell->cdr == &nil_cell))
 #define NIL (&nil_cell)
 #define IS_T(cell) (!IS_NIL(cell))
 #define T (&true_cell)
@@ -46,6 +46,8 @@
 #define TAG_SPEC_EX_DATA    (0x05 << 8) // wasn't found, etc.
 #define TAG_SPEC_EX_IO      (0x06 << 8) // error in io op
 
+#define EXCEPTION_OF(spec, str) (Cell){TAG_MAGIC | TAG_TYPE_EXCEPTION | TAG_STATIC | spec, &(Cell){TAG_MAGIC | TAG_TYPE_STRING | TAG_STATIC, str, NIL}, NIL}
+
 // TODO: the whole stream interface is sus
 #define TAG_SPEC_STM_FILE   (0x01 << 8) // file IO
 
@@ -79,6 +81,8 @@ extern Cell* sym_top;
 extern Cell nil_cell;
 extern Cell true_cell;
 
+extern Cell stex_interrupted;
+
 void memory_init(int cells);
 
 int memory_get_used();
@@ -89,14 +93,15 @@ int memory_length(Cell* begin);
 Cell* memory_single_copy(Cell* src);
 Cell* memory_shallow_copy(Cell* begin);
 Cell* memory_deep_copy(Cell* begin);
+Cell* memory_extend(Cell* last);
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr);
 
 void memory_build_number(Cell* found, double value);
 Cell* memory_alloc_number(double value);
 
-void memory_build_string(Cell* found, char* src);
-Cell* memory_alloc_string(char* src);
+void memory_build_string(Cell* found, char* src, int len);
+Cell* memory_alloc_string(char* src, int len);
 
 void memory_build_symbol(Cell* found, char* src);
 Cell* memory_alloc_symbol(char* src);
@@ -117,11 +122,10 @@ Cell* memory_alloc_stream(void* repr);
 
 // ---
 
-bool symbol_eql(Cell* one, Cell* two);
-bool string_eql(Cell* one, Cell* two);
 char* symbol_string_ptr(Cell* sym);
 char* string_ptr(Cell* str);
 bool symbol_is_keyword(Cell* sym);
+bool symbol_matches(Cell* sym, char* name);
 
 // ---
 

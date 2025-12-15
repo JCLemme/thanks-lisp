@@ -18,3 +18,16 @@ j
 i
 j
 (garbage)
+(def A (lambda (k x1 x2 x3 x4 x5) (nlet ((B (lambda () (progn (print k) (setq k (- k 1)) (A k B x1 x2 x3 x4) )))) (if (<= k 0) (+ (x4) (x5)) (B)))))
+(A 10 (lambda () 1) (lambda () -1) (lambda () -1) (lambda () 1) (lambda () 0))
+(garbage)
+(+
+)))))
+(" e32k 23k00k 3k 23k23
+ 3"
+ 23
+
+(- 9)
+(def nooo '(0 2 3))
+(nconc nooo '(22 22) 8)
+nooo

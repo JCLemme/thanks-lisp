@@ -12,7 +12,7 @@ Cell temp_root;
 Cell* frame_push_in(Cell* pkg, Cell* def)
 {
     if(IS_TYPE(((Cell*)def->car)->tag, TAG_TYPE_SYMBOL) && symbol_is_keyword(def->car)) 
-        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: can't define a keyword"));
+        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: can't define a keyword", -1));
 
     Cell* new_entry = memory_alloc_cons(def, pkg->cdr);
     pkg->cdr = new_entry;
@@ -55,7 +55,7 @@ Cell* frame_pop_in(Cell* pkg, int count)
     }
 
     if(count > 0)
-        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: tried to pop too many times"));
+        return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: tried to pop too many times", -1));
 
     pkg->cdr = walker;
     return walker;
@@ -124,7 +124,8 @@ Cell* frame_find_def_in(Cell* pkg, Cell* name)
 
         walker = walker->cdr;
     }
-    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol"));
+    return NULL;
+    //return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol", -1));
 }
 
 Cell* frame_find_defn_in(Cell* pkg, char* name)
@@ -153,7 +154,8 @@ Cell* frame_find_def_from(Cell* pkg, Cell* name)
 
         walker = walker->cdr;
     }
-    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol"));
+    return NULL;
+    //return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find definition for symbol", -1));
 }
 
 Cell* frame_find_defn_from(Cell* pkg, char* name)
@@ -185,7 +187,7 @@ Cell* frame_find_package(Cell* name)
 
         walker = walker->cdr;
     }
-    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find package"));
+    return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("<internal>: couldn't find package", -1));
 }
 
 Cell* frame_find_packagen(char* name)

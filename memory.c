@@ -22,6 +22,8 @@ static int rootshw = 0;
 Cell nil_cell;
 Cell true_cell;
 
+Cell stex_interrupted = {TAG_MAGIC | TAG_STATIC | TAG_TYPE_EXCEPTION, &(Cell){TAG_MAGIC | TAG_STATIC | TAG_TYPE_STRING, "<>: interrupted", NIL}, NIL};
+
 // TODO: i think I can save a mark() pass if symbols refer to the cons cell in this list
 // or not since that would make holes...
 Cell* sym_top = NULL;
@@ -65,8 +67,24 @@ Cell* memory_nth(Cell* begin, int place)
 
 int memory_length(Cell* begin)
 {
-    if(IS_NIL(begin)) { return 0; }
-    return 1 + memory_length(begin->cdr);
+    int acc = 0;
+    while(!IS_NIL(begin))
+    {
+        acc++;
+        begin = begin->cdr;
+    }
+    return acc;
+}
+
+Cell* memory_last(Cell* begin)
+{
+    Cell* last = begin;
+    while(!IS_NIL(begin))
+    {
+        last = begin;
+        begin = begin->cdr;
+    }
+    return last;
 }
 
 Cell* memory_single_copy(Cell* src)
@@ -79,14 +97,15 @@ Cell* memory_single_copy(Cell* src)
 Cell* memory_shallow_copy(Cell* begin)
 {
     if(IS_NIL(begin)) { return NIL; }
-    Cell* copy = memory_alloc_cons(NIL, NIL);
-    Cell* save = copy;
+    Cell* copy = NIL;
+    Cell* save = NIL;
 
     while(!IS_NIL(begin))
     {
+        copy = memory_extend(copy);
+        if(IS_NIL(save)) { save = copy; }
+
         copy->car = begin->car;
-        copy->cdr = memory_alloc_cons(NIL, NIL);
-        copy = copy->cdr;
         begin = begin->cdr;
     }
 
@@ -99,14 +118,15 @@ Cell* memory_deep_copy(Cell* begin)
 
     if(IS_TYPE(begin->tag, TAG_TYPE_CONS))
     {
-        Cell* copy = memory_alloc_cons(NIL, NIL);
-        Cell* save = copy;
+        Cell* copy = NIL;
+        Cell* save = NIL;
 
         while(!IS_NIL(begin))
         {
+            copy = memory_extend(copy);
+            if(IS_NIL(save)) { save = copy; }
+
             copy->car = memory_deep_copy(begin->car);
-            copy->cdr = memory_alloc_cons(NIL, NIL);
-            copy = copy->cdr;
             begin = begin->cdr;
         }
 
@@ -118,7 +138,21 @@ Cell* memory_deep_copy(Cell* begin)
     }
 }
 
+Cell* memory_extend(Cell* last)
+{
+    if(IS_NIL(last))
+    {
+        return memory_alloc_cons(NULL, NIL);
+    }
+    else
+    {
+        Cell* newc = memory_alloc_cons(NULL, NIL);
+        last->cdr = newc;
+        return newc;
+    }
+}
 
+static int lfree = 0;
 
 Cell* memory_alloc_cons(Cell* ar, Cell* dr)
 {
@@ -160,9 +194,9 @@ Cell* memory_alloc_number(double value)
     return found;
 }
 
-void memory_build_string(Cell* found, char* src)
+void memory_build_string(Cell* found, char* src, int len)
 {
-    int len = strlen(src);
+    if(len < 0) { len = strlen(src); }
     found->size = len;
 
     if(len < 8)
@@ -183,10 +217,10 @@ void memory_build_string(Cell* found, char* src)
     }
 }
 
-Cell* memory_alloc_string(char* src)
+Cell* memory_alloc_string(char* src, int len)
 {
     Cell* found = memory_alloc_cons(NIL, NIL);
-    memory_build_string(found, src);
+    memory_build_string(found, src, len);
     return found;
 }
 
@@ -236,7 +270,7 @@ void memory_build_symbol(Cell* found, char* src)
     }
 
     // It wasn't found, so make it.
-    Cell* new_str = memory_alloc_string(src);
+    Cell* new_str = memory_alloc_string(src, -1);
     Cell* new_sym = memory_alloc_cons(new_str, NULL);
 
     if(sym_top == NULL)
@@ -336,6 +370,7 @@ Cell* memory_alloc_stream(void* repr)
 
 char* symbol_string_ptr(Cell* sym)
 {
+    if(!IS_TYPE(sym->tag, TAG_TYPE_SYMBOL)) { return NULL; }
     Cell* symstr = sym->car;
     if(IS_TYPE(symstr->tag, TAG_TYPE_PSTRING))
         return (char*)&(symstr->car);
@@ -348,14 +383,23 @@ char* string_ptr(Cell* str)
 {
     if(IS_TYPE(str->tag, TAG_TYPE_PSTRING))
         return (char*)&(str->car);
-    else
+    else if(IS_TYPE(str->tag, TAG_TYPE_STRING))
         return (char*)str->car;
+    else
+        return NULL;
 }
 
 bool symbol_is_keyword(Cell* sym)
 {
+    if(!IS_TYPE(sym->tag, TAG_TYPE_SYMBOL)) { return false; }
     char* str = symbol_string_ptr(sym);
     return (str[0] == ':');
+}
+
+bool symbol_matches(Cell* sym, char* name)
+{
+    if(!IS_TYPE(sym->tag, TAG_TYPE_SYMBOL)) { return false; }
+    return (strcmp(symbol_string_ptr(sym), name) == 0);
 }
 
 // ---
@@ -460,7 +504,7 @@ int memory_sweep()
 
             this_cell->car = NULL;
             this_cell->cdr = NULL;
-            this_cell->tag = TAG_MAGIC;
+            this_cell->tag = TAG_MAGIC | TAG_TYPE_CONS;
 
             if(new_free_list == NULL)
             {
