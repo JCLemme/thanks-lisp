@@ -89,8 +89,20 @@ Cell* memory_last(Cell* begin)
 
 Cell* memory_single_copy(Cell* src)
 {
+    // WHAT FUCKING BUG IS THIS
+    // HEISENBUG
+    // FUCKING WASM POINTER TYPES SOMETHING GOD DAMNIT
     Cell* newc = memory_alloc_cons(src->car, src->cdr);
     newc->tag = src->tag;
+
+    if(IS_TYPE(src->tag, TAG_TYPE_NUMBER))
+    {
+        // FINE JACKASS WE'LL DO IT YOUR WAY
+        newc->num = src->num;
+        newc->size = src->size;
+    }
+
+    // ok i've calmed down
     return newc;
 }
 

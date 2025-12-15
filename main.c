@@ -849,6 +849,23 @@ Cell* fn_typep(Cell* args)
     else { return NIL; }
 }
 
+Cell* fn_type_of(Cell* args)
+{
+    Cell* target = memory_nth(args, 0)->car;
+
+    if(IS_TYPE(target->tag, TAG_TYPE_CONS)) { return memory_alloc_symbol(":cons"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_NUMBER)) { return memory_alloc_symbol(":number"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_LAMBDA)) { return memory_alloc_symbol(":lambda"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL)) { return memory_alloc_symbol(":symbol"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_ARRAY)) { return memory_alloc_symbol(":array"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_BUILTIN)) { return memory_alloc_symbol(":builtin"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_HARDLINK)) { return memory_alloc_symbol(":hardlink"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_EXCEPTION)) { return memory_alloc_symbol(":exception"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_STREAM)) { return memory_alloc_symbol(":stream"); }
+    if(IS_TYPE(target->tag, TAG_TYPE_STRING) || IS_TYPE(target->tag, TAG_TYPE_PSTRING)) { return memory_alloc_symbol(":string"); }
+    else { return NIL; }
+}
+
 Cell* _do_backquote(Cell* target)
 {
     if(IS_TYPE(target->tag, TAG_TYPE_CONS))
@@ -913,10 +930,40 @@ Cell* fn_time(Cell* args)
     return result;
 }
 
+/*
+extern Cell* fn_pain(Cell* args);
+// ...soon
+__asm__
+(
+    "_fn_pain:\n"
+        "stp x29, x30, [sp, #-16]!\n"
+        "mov x29, sp\n"
+
+        "bl _fn_add\n"
+
+        "ldp x29, x30, [sp], #16\n"
+        "ret\n"
+);
+*/
+
 // -- -- -- -- --
 
 int main(int argc, char** argv) 
 {
+    // Basic, basic support for arguments.
+    if(argc > 1)
+    {
+        for(int a = 1; a < argc; a++)
+        {
+            if(strcmp(argv[a], "--testmode") == 0)
+            {
+#ifdef USE_READLINE
+                save_history = false;
+#endif
+            }
+        }
+    }
+
     // Start up core.
     memory_init(CELL_AREA);
     frame_init();
@@ -975,16 +1022,18 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "env-root", memory_alloc_builtin(fn_env_root, 0));
     frame_push_defn_in(&env_root, "map", memory_alloc_builtin(fn_map, 0));
     frame_push_defn_in(&env_root, "typep", memory_alloc_builtin(fn_typep, 0));
+    frame_push_defn_in(&env_root, "type-of", memory_alloc_builtin(fn_type_of, 0));
     frame_push_defn_in(&env_root, "backquote", memory_alloc_builtin(fn_backquote, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "comma", memory_alloc_builtin(fn_comma, 0));
     frame_push_defn_in(&env_root, "time", memory_alloc_builtin(fn_time, TAG_SPEC_FUNLAZY));
+    //frame_push_defn_in(&env_root, "pain", memory_alloc_builtin(fn_pain, 0));
    
     frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
     // env-root should be a variable too, but printing it causes an infinite loop, so.
 
     // And do some legwork.
-    //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
-    //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (backquote (cond ((comma cd) (comma ys)) (t (comma no)))) ))"));
+  //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
+  //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (backquote (cond ((comma cd) (comma ys)) (t (comma no)))) ))"));
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) `(cond (,cd ,ys) (t ,no)) ))"));
 
     //_evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));

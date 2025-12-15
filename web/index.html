@@ -44,7 +44,7 @@
     <script type="module">
         import "https://unpkg.com/@xterm/xterm/lib/xterm.js";
         import "https://cdn.jsdelivr.net/npm/xterm-addon-fit"
-        import { openpty } from "https://unpkg.com/xterm-pty/index.mjs";
+        import { openpty } from "./index.mjs";
         import initEmscripten from "./test.mjs";
 
         var xterm = new Terminal({ fontFamily: 'LispM, monospaced', fontSize: 13, cols: 132, rows: 48, theme: {foreground: "black", background: "white", cursor: "black", selectionForeground: "white", selectionBackground: "black"} });

@@ -31,3 +31,6 @@ j
 (def nooo '(0 2 3))
 (nconc nooo '(22 22) 8)
 nooo
+(type-of '(cons 1 2))
+`(1 2 3 4 ,(+ 1 1))
+
