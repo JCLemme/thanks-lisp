@@ -103,8 +103,9 @@ Cell* memory_alloc_number(double value);
 void memory_build_string(Cell* found, char* src, int len);
 Cell* memory_alloc_string(char* src, int len);
 
-void memory_build_symbol(Cell* found, char* src);
+void memory_build_symbol(Cell* found, char* src, int len);
 Cell* memory_alloc_symbol(char* src);
+Cell* memory_alloc_symboln(char* src, int len);
 
 void memory_build_lambda(Cell* found, Cell* args, Cell* body, int tags);
 Cell* memory_alloc_lambda(Cell* args, Cell* body, int tags);

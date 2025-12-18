@@ -127,7 +127,6 @@ Cell* _hardlinker(Cell* target, Cell* lambs)
             // top level of the environment, i.e. lexical definitions only.
             Cell* found_def = frame_find_def_in(&env_top, target); 
            
-            // TODO: an internal version of this function that doesn't allocate an exception. Wasteful
             if(found_def == NULL)
             {
                 return target; // Must be a global - ignore it.
@@ -150,6 +149,51 @@ Cell* _hardlinker(Cell* target, Cell* lambs)
         while(!IS_NIL(todo))
         {
             todo->car = _hardlinker(todo->car, lambs);
+            todo = todo->cdr;
+        }
+
+        return target;
+    }
+}
+
+Cell* _hardlink_dynamic(Cell* target)
+{
+    // Recurse, replacing references to objects in the lexical environment with links thereto.
+    if(!IS_TYPE(target->tag, TAG_TYPE_CONS))
+    {
+        if(IS_TYPE(target->tag, TAG_TYPE_SYMBOL))
+        {
+            // Symbol definitions are sus. Note that "find_def_in" will only look within the 
+            // top level of the environment, i.e. lexical definitions only.
+            Cell* found_def = frame_find_def_from(&env_top, target); 
+           
+            if(found_def == NULL)
+            {
+                return target; // Must be a global - ignore it.
+            }
+            else
+            {
+                return memory_alloc_hardlink(found_def); // Got you motherfucker
+            }
+        }
+//        else if(IS_TYPE(target->tag, TAG_TYPE_LAMBDA))
+//        {
+//            // We want to modify lambda-lists however.
+//
+//        }
+        else
+        {
+            // Don't touch anything else.
+            return target;
+        }
+    }
+    else
+    {
+        // SEEK AND DESTROY
+        Cell* todo = target;
+        while(!IS_NIL(todo))
+        {
+            todo->car = _hardlink_dynamic(todo->car);
             todo = todo->cdr;
         }
 

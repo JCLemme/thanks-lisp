@@ -53,7 +53,7 @@ void memory_init(int cells)
     nil_cell.car = NULL;
     nil_cell.cdr = NULL;
 
-    memory_build_symbol(&true_cell, "t");
+    memory_build_symbol(&true_cell, "t", -1);
     true_cell.tag |= TAG_STATIC;
 }
 
@@ -236,16 +236,16 @@ Cell* memory_alloc_string(char* src, int len)
     return found;
 }
 
-void memory_build_symbol(Cell* found, char* src)
+void memory_build_symbol(Cell* found, char* src, int len)
 {
     // Walk the symbol table please.
     Cell* sym_current = sym_top;
     Cell* sym_last = sym_top;
-    int len = strlen(src);
+    len = (len < 0) ? strlen(src) : len;
 
     found->tag = OF_TYPE(found->tag, TAG_TYPE_SYMBOL);
     D(printf("memory: building new symbol in cell %08x\n", found));
-    D(printf("memory: looking for symstr '%s'...\n", src));
+    D(printf("memory: looking for symstr '%.*s'...\n", len, src));
 
     while(sym_current != NULL)
     {
@@ -257,7 +257,7 @@ void memory_build_symbol(Cell* found, char* src)
             if(str_current->tag == TAG_TYPE_PSTRING)
             {
                 // It's packed.
-                if(strncmp(src, (char*)&(str_current->car), 7) == 0)
+                if(strncmp(src, (char*)&(str_current->car), len) == 0)
                 {
                     D(printf("memory: ...found packed in cell %08x\n", str_current));
                     found->car = str_current;
@@ -267,7 +267,7 @@ void memory_build_symbol(Cell* found, char* src)
             else
             {
                 // It's not packed.
-                if(strcmp(src, str_current->car) == 0)
+                if(strncmp(src, str_current->car, len) == 0)
                 {
                     D(printf("memory: ...found in cell %08x\n", str_current));
                     found->car = str_current;
@@ -282,7 +282,7 @@ void memory_build_symbol(Cell* found, char* src)
     }
 
     // It wasn't found, so make it.
-    Cell* new_str = memory_alloc_string(src, -1);
+    Cell* new_str = memory_alloc_string(src, len);
     Cell* new_sym = memory_alloc_cons(new_str, NULL);
 
     if(sym_top == NULL)
@@ -297,7 +297,14 @@ void memory_build_symbol(Cell* found, char* src)
 Cell* memory_alloc_symbol(char* src)
 {
     Cell* found = memory_alloc_cons(NIL, NIL);
-    memory_build_symbol(found, src);
+    memory_build_symbol(found, src, -1);
+    return found;
+}
+
+Cell* memory_alloc_symboln(char* src, int len)
+{
+    Cell* found = memory_alloc_cons(NIL, NIL);
+    memory_build_symbol(found, src, len);
     return found;
 }
 
@@ -456,8 +463,13 @@ int memory_mark(Cell* begin)
     }
 
     int found = 1;
-    if(begin->tag & TAG_MARKED) { found = 0; }
-    begin->tag |= TAG_MARKED;
+    if(begin->tag & TAG_MARKED ) {
+
+        return 0;
+    }
+
+    if(!(begin->tag & TAG_STATIC))
+        begin->tag |= TAG_MARKED;
 
     if(IS_TYPE(begin->tag, TAG_TYPE_CONS))
     {

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "memory.h"
 #include "frame.h"
@@ -53,6 +54,13 @@ void history_saver()
     }
 }
 
+/*int sexp_ready()
+{
+    int idx = 0;
+    Cell* made = _recurse_sexps(rl_line_buffer, &idx);    
+    return made == NULL;
+}
+*/
 #else
 
 char replin[2048];
@@ -340,6 +348,49 @@ Cell* fn_mod(Cell* args)
     Cell* den = memory_nth(args, 1)->car;
 
     return memory_alloc_number((int)num->num % (int)den->num);
+}
+
+Cell* fn_sin(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+
+    return memory_alloc_number(sin(num->num));
+}
+
+Cell* fn_cos(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+
+    return memory_alloc_number(cos(num->num));
+}
+
+Cell* fn_tan(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+
+    return memory_alloc_number(tan(num->num));
+}
+
+Cell* fn_sqrt(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+
+    return memory_alloc_number(sqrt(num->num));
+}
+
+Cell* fn_pow(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+    Cell* den = memory_nth(args, 1)->car;
+
+    return memory_alloc_number(pow(num->num, den->num));
+}
+
+Cell* fn_truncate(Cell* args)
+{
+    Cell* num = memory_nth(args, 0)->car;
+
+    return memory_alloc_number(trunc(num->num));
 }
 
 Cell* fn_lambda(Cell* args)
@@ -793,10 +844,12 @@ Cell* fn_pyprint_to(Cell* args)
             _print_sexps_to_file(file, next);
         }
 
+        fprintf(file, " ");
         args = args->cdr;
     }
 
     fprintf(file, "\n");
+    fflush(file);
     return NIL;
 }
 
@@ -930,21 +983,40 @@ Cell* fn_time(Cell* args)
     return result;
 }
 
-/*
-extern Cell* fn_pain(Cell* args);
-// ...soon
-__asm__
-(
-    "_fn_pain:\n"
-        "stp x29, x30, [sp, #-16]!\n"
-        "mov x29, sp\n"
+Cell* fn_fast(Cell* args)
+{
+    Cell* form = memory_deep_copy(args->car);
+    form->cdr = _hardlink_dynamic(form->cdr);
+    return form;
+}
 
-        "bl _fn_add\n"
+Cell* fn_sleep(Cell* args)
+{
+    Cell* sec = args->car;
+    sleep(sec->num);
+    return sec;
+}
 
-        "ldp x29, x30, [sp], #16\n"
-        "ret\n"
-);
-*/
+Cell* fn_decoded_time(Cell* args)
+{
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time ( &rawtime );
+    timeinfo = localtime ( &rawtime );
+
+    Cell* built = NIL;
+    Cell* saved = NIL;
+
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_sec); saved = built;
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_min);
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_hour);
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_mday);
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_mon);
+    built = memory_extend(built); built->car = memory_alloc_number(timeinfo->tm_year);
+
+    return saved;
+}
 
 // -- -- -- -- --
 
@@ -988,6 +1060,12 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "*", memory_alloc_builtin(fn_mul, 0));
     frame_push_defn_in(&env_root, "/", memory_alloc_builtin(fn_div, 0));
     frame_push_defn_in(&env_root, "mod", memory_alloc_builtin(fn_mod, 0));
+    frame_push_defn_in(&env_root, "sin", memory_alloc_builtin(fn_sin, 0));
+    frame_push_defn_in(&env_root, "cos", memory_alloc_builtin(fn_cos, 0));
+    frame_push_defn_in(&env_root, "tan", memory_alloc_builtin(fn_tan, 0));
+    frame_push_defn_in(&env_root, "sqrt", memory_alloc_builtin(fn_sqrt, 0));
+    frame_push_defn_in(&env_root, "pow", memory_alloc_builtin(fn_pow, 0));
+    frame_push_defn_in(&env_root, "truncate", memory_alloc_builtin(fn_truncate, 0));
     frame_push_defn_in(&env_root, "lambda", memory_alloc_builtin(fn_lambda, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "macro", memory_alloc_builtin(fn_macro, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "read", memory_alloc_builtin(fn_read, 0));
@@ -1026,25 +1104,36 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "backquote", memory_alloc_builtin(fn_backquote, TAG_SPEC_FUNLAZY));
     frame_push_defn_in(&env_root, "comma", memory_alloc_builtin(fn_comma, 0));
     frame_push_defn_in(&env_root, "time", memory_alloc_builtin(fn_time, TAG_SPEC_FUNLAZY));
-    //frame_push_defn_in(&env_root, "pain", memory_alloc_builtin(fn_pain, 0));
-   
+    frame_push_defn_in(&env_root, "fast", memory_alloc_builtin(fn_fast, 0));
+    frame_push_defn_in(&env_root, "sleep", memory_alloc_builtin(fn_sleep, 0));
+    frame_push_defn_in(&env_root, "decoded-time", memory_alloc_builtin(fn_decoded_time, 0));
+
     frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
+    frame_push_defn_in(&env_root, "*reader-macros*", &reader_macros);
     // env-root should be a variable too, but printing it causes an infinite loop, so.
 
-    // And do some legwork.
-  //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (list 'cond (list cd ys) (list t no))))"));
-  //_evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) (backquote (cond ((comma cd) (comma ys)) (t (comma no)))) ))"));
-    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) `(cond (,cd ,ys) (t ,no)) ))"));
+    // Make some standard defines.
 
-    //_evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) (list 'let (list (list 'i '0)) (list 'tagbody 'g_loop bd (list 'setq 'i (list '+ 'i '1)) (list 'cond (list (list '< 'i ct) (list 'go 'g_loop))) ))))"));
+    // Quoting is handled with this disgusting macro. Note the use of "rplaca" - we're
+    // guaranteeing that this is the first defined reader macro.
+    _evaluate_sexp(_parse_sexps("(rplaca *reader-macros* (cons \"'\" (macro (x) (list (quote quote) (list (quote quote) x)))))"));
+
+    // Same idea, but for backquote.
+    _evaluate_sexp(_parse_sexps("(nconc *reader-macros* (list (cons \"`\" (macro (x) (list 'quote (list 'backquote x))))))"));
+    _evaluate_sexp(_parse_sexps("(nconc *reader-macros* (list (cons \",\" (macro (x) (list 'quote (list 'comma x))))))"));
+
+    // Fun wrappers around primitive conditionals and loops.
+    _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) `(cond (,cd ,ys) (t ,no)) ))"));
     _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) `(let ((i 0)) (tagbody g_loop ,bd (setq i (+ i 1)) (cond ((< i ,ct) (go g_loop))))) ))"));
 
+    // Helper shims for benchmarks - might make it into the standard library, might not.
     _evaluate_sexp(_parse_sexps("(def plusp (lambda (qu) (> qu 0)))"));
     _evaluate_sexp(_parse_sexps("(def first (lambda (qu) (car qu)))"));
     _evaluate_sexp(_parse_sexps("(def second (lambda (qu) (car (cdr qu))))"));
     _evaluate_sexp(_parse_sexps("(def rest (lambda (qu) (cdr qu)))"));
-    
     _evaluate_sexp(_parse_sexps("(def not (lambda (ts) (cond (ts nil) (t t))))"));
+    
+    // Benchmarks to test speed with macros vs without.
     _evaluate_sexp(_parse_sexps("(def tak (lambda (x y z) (if (not (< y x)) z (tak (tak (- x 1) y z) (tak (- y 1) z x) (tak (- z 1) x y)))))"));
     _evaluate_sexp(_parse_sexps("(def ttak (lambda (x y z) (cond ((not (< y x)) z) (t (ttak (ttak (- x 1) y z) (ttak (- y 1) z x) (ttak (- z 1) x y))))))"));
 
@@ -1052,6 +1141,10 @@ int main(int argc, char** argv)
     memory_add_root(&env_top);
     memory_add_root(&temp_root);
     memory_add_root(sym_top);
+
+    // TODO: this logic should live in the repl file
+
+    memory_add_root(&reader_macros);
 
     // Set up some handlers.
 #ifdef USE_READLINE
@@ -1063,6 +1156,7 @@ int main(int argc, char** argv)
     rl_variable_bind("history-size", "300");
     rl_initialize();
     rl_bind_key ('\t', rl_insert);
+    //rl_bind_key ('\n', sexp_ready);
 #endif
 
     printf("Thanks lisp v2\n");

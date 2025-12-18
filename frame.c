@@ -135,6 +135,7 @@ Cell* frame_find_defn_in(Cell* pkg, char* name)
 }
 
 
+void _print_sexps(Cell*);
 Cell* frame_find_def_from(Cell* pkg, Cell* name)
 {
     if(symbol_is_keyword(name)) 
@@ -199,7 +200,7 @@ Cell* frame_find_packagen(char* name)
 Cell* frame_set_def(Cell* name, Cell* nvalue)
 {
     Cell* found_def = frame_find_def(name);
-    if(!IS_TYPE(found_def->tag, TAG_TYPE_EXCEPTION))
+    if(found_def != NULL)
         found_def->cdr = nvalue;
     return found_def;
 }
@@ -213,15 +214,15 @@ Cell* frame_set_defn(char* name, Cell* nvalue)
 Cell* frame_init()
 {
     // Must build the system.
-    env_root.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    env_root.tag = TAG_MAGIC | TAG_STATIC | TAG_TYPE_CONS;
     env_root.car = memory_alloc_symbol(":root");
     env_root.cdr = NIL;
 
-    env_top.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    env_top.tag = TAG_MAGIC | TAG_STATIC | TAG_TYPE_CONS;
     env_top.car = memory_alloc_symbol(":top");
     env_top.cdr = &env_root;
     
-    temp_root.tag = TAG_MAGIC | TAG_TYPE_CONS;
+    temp_root.tag = TAG_MAGIC | TAG_STATIC | TAG_TYPE_CONS;
     temp_root.car = memory_alloc_symbol(":temp");
     temp_root.cdr = NIL;
 

@@ -11,6 +11,7 @@ Well, off to fix that. Two days later and here is that Lisp. It's a mess (first 
 * Closures (it's a [MAN](https://en.wikipedia.org/wiki/Man_or_boy_test) baby)
 * Macros
 * Backquote forms
+* Reader macros
 * &optional and &rest lambda arguments
 * File I/O
 * Usually doesn't segfault
