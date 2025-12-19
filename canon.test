@@ -15,17 +15,17 @@ dubb
 * hehe
 1
 * (hehe)[C[C[C[C[C[C[C[C
-Exception (type 3) in eval: '1' not a function
+Exception (type 3) in eval: '1' not a function
 * (+ "1" 2)[C[C[C[C[C[C[C[C[C[C[C
-Exception (type 3) in add: not a number
+Exception (type 3) in add: not a numberc
 * (tak 18 12 6)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 7
 * (ttak 18 12 6)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 7
 * (append '(1 2 3)[C[C[C[C[C[C[C '(4 5 6)[C[C[C[C[C[C[C 7)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 (1 2 3 4 5 6 . 7)
-* (pyprint '(1 2 3)[C[C[C[C[C[C[C " is a list with car " (car '(1 2 3)[C[C[C[C[C[C[C) " and cdr " (cdr '(1 2 3)[C[C[C[C[C[C[C))
-(1 2 3)  is a list with car  1  and cdr  (2 3) 
+* (pyprint '(1 2 3)[C[C[C[C[C[C[C " is a list with car " (car '(1 2 3)[C[C[C[C[C[C[C) " and cdr " (cdr '(1 2 3)[C[C[C[C[C[C[C)) [A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[K)
+(1 2 3)  is a list with car  7 1  and cdr  (2 3) 
 ()
 * (dotimes 10 (print i)[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 0
@@ -51,20 +51,27 @@ Exception (type 3) in eval: symbol 'i' undefined
 * j
 Exception (type 3) in eval: symbol 'j' undefined
 * (garbage)[C[C[C[C[C[C[C[C[C[C[C
-838
-* (def A (lambda (k x1 x2 x3 x4 x5)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (nlet ((B (lambda ()[C[C (progn (setq k (- k 1)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (A k B x1 x2 x3 x4)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C )[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (if (<= k 0)[C[C[C[C[C[C[C[C (+ (x4)[C[C[C[C (x5)[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C (B)[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C) [A[C[C
-[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[K)
+966
+* (def A (lambda (k x1 x2 x3 x4 x5)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (nlet ((B (lambda ()[C[C (progn (setq k (- k 1)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (A k B x1 x2 x3 x4)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C )[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (if (<= k 0)[C[C[C[C[C[C[C[C (+ (x4)[C[C[C[C (x5)[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C (B)[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 A
 * (A 10 (lambda ()[C[C 1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C -1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C -1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C 1)[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C 0)[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
 -67
 * (garbage)[C[C[C[C[C[C[C[C[C[C[C
-932
+1060
 * (+
-Exception (type 5) in read: malformed sexps
+Exception (type 5) in read: malformed sexpsio
 * )))))
-Exception (type 5) in read: malformed sexps
+Exception (type 5) in read: malformed sexpsfi
 * (" e32k 23k00k 3k 23k23
-Exception (type 5) in read: malformed sexps
+Exception (type 5) in read: malformed sexps7
 *  3"
 Exception (type 3) in eval: symbol '3"' undefined
 *  23
@@ -84,4 +91,4 @@ nooo
 (1 2 3 4 2)
 * 
 * 
-main: used 1080/409600 cells (0%)
+main: used 1206/409600 cells (0%)

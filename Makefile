@@ -1,6 +1,13 @@
 SHELL=/bin/bash
-CFLAGS=-I/opt/homebrew/opt/readline/include -Wno-format -DUSE_READLINE
-LDFLAGS=-L/opt/homebrew/opt/readline/lib -lreadline
+HOST=$(shell uname -s)
+
+CFLAGS=-Wno-format -DUSE_READLINE
+LDFLAGS=-lreadline
+
+ifeq ($(HOST),Darwin)
+	CFLAGS += -I/opt/homebrew/opt/readline/include
+	LDFLAGS += -L/opt/homebrew/opt/readline/lib
+endif
 
 SRCFILES=main.c memory.c frame.c util.c repl_read.c repl_print.c repl_eval.c
 

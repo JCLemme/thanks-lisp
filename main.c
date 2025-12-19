@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "memory.h"
 #include "frame.h"
@@ -45,26 +46,6 @@ char* thanks_gets(char* prompt)
 
 #define HIST_FILE "./.thanks_history"
 
-void history_saver()
-{
-    if(executing)
-    {
-        got_interrupt = true;
-    }
-    else
-    {
-        write_history(HIST_FILE);
-        exit(0);
-    }
-}
-
-/*int sexp_ready()
-{
-    int idx = 0;
-    Cell* made = _recurse_sexps(rl_line_buffer, &idx);    
-    return made == NULL;
-}
-*/
 #else
 
 char replin[2048];
@@ -100,6 +81,28 @@ char* thanks_gets(char* prompt)
 }
 
 #endif
+
+void inthandler(int sig)
+{
+    if(executing)
+    {
+        got_interrupt = true;
+    }
+    else
+    {
+#ifdef USE_READLINE
+        write_history(HIST_FILE);
+#endif
+        exit(0);
+    }
+}
+
+/*int sexp_ready()
+{
+    int idx = 0;
+    Cell* made = _recurse_sexps(rl_line_buffer, &idx);    
+    return made == NULL;
+}*/
 
 #define CELL_AREA 409600
 
@@ -1230,9 +1233,14 @@ int main(int argc, char** argv)
     memory_add_root(&reader_macros);
 
     // Set up some handlers.
+    struct sigaction sa;
+    sa.sa_handler = inthandler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &sa, NULL);
+
 #ifdef USE_READLINE
     using_history();
-    signal(SIGINT, history_saver);
     read_history(HIST_FILE);
 
     rl_variable_bind("blink-matching-paren", "on");
