@@ -92,7 +92,7 @@ Cell* memory_single_copy(Cell* src)
     // WHAT FUCKING BUG IS THIS
     // HEISENBUG
     // FUCKING WASM POINTER TYPES SOMETHING GOD DAMNIT
-    Cell* newc = memory_alloc_cons(src->car, src->cdr);
+    Cell* newc = memory_alloc_cons(NIL, NIL);
     newc->tag = src->tag;
 
     if(IS_TYPE(src->tag, TAG_TYPE_NUMBER))
@@ -101,8 +101,28 @@ Cell* memory_single_copy(Cell* src)
         newc->num = src->num;
         newc->size = src->size;
     }
+    else if(IS_TYPE(src->tag, TAG_TYPE_PSTRING))
+    {
+        newc->data = src->data;
+        newc->size = src->size;
+    }
+    else if(IS_TYPE(src->tag, TAG_TYPE_STRING))
+    {
+        // TODO: probably a better way to effect this
+        int len = strlen(src->car);
+        newc->car = malloc(len + 2);
+        strncpy(newc->car, src->car, len);
+        newc->size = src->size;
+    }
+    else
+    {
+        newc->car = src->car;
+        newc->cdr = src->cdr;
+    }
 
     // ok i've calmed down
+    // wasm uses 32bit pointers
+    // now i know
     return newc;
 }
 
@@ -254,10 +274,10 @@ void memory_build_symbol(Cell* found, char* src, int len)
         
         if(str_current->size == len)
         {
-            if(str_current->tag == TAG_TYPE_PSTRING)
+            if(IS_TYPE(str_current->tag, TAG_TYPE_PSTRING))
             {
                 // It's packed.
-                if(strncmp(src, (char*)&(str_current->car), len) == 0)
+                if(strncmp(src, (char*)&(str_current->data), len) == 0)
                 {
                     D(printf("memory: ...found packed in cell %08x\n", str_current));
                     found->car = str_current;
@@ -392,7 +412,7 @@ char* symbol_string_ptr(Cell* sym)
     if(!IS_TYPE(sym->tag, TAG_TYPE_SYMBOL)) { return NULL; }
     Cell* symstr = sym->car;
     if(IS_TYPE(symstr->tag, TAG_TYPE_PSTRING))
-        return (char*)&(symstr->car);
+        return (char*)&(symstr->data);
     else
         return (char*)symstr->car;
 
@@ -401,7 +421,7 @@ char* symbol_string_ptr(Cell* sym)
 char* string_ptr(Cell* str)
 {
     if(IS_TYPE(str->tag, TAG_TYPE_PSTRING))
-        return (char*)&(str->car);
+        return (char*)&(str->data);
     else if(IS_TYPE(str->tag, TAG_TYPE_STRING))
         return (char*)str->car;
     else
@@ -421,12 +441,21 @@ bool symbol_matches(Cell* sym, char* name)
     return (strcmp(symbol_string_ptr(sym), name) == 0);
 }
 
+bool is_form_of(Cell* target, char* name)
+{
+    if(!IS_TYPE(target->tag, TAG_TYPE_CONS)) { return false; }
+    Cell* first = target->car;
+    if(IS_NIL(first) || !IS_TYPE(first->tag, TAG_TYPE_SYMBOL)) { return false; }
+    return symbol_matches(first, name);
+}
+
 // ---
 
 void memory_free(Cell* target)
 {
     // Manually free a cell we know we won't need again.
     // Dragons: you bet
+    abort();
     if(IS_NIL(target)) { return; }
 
     if(IS_TYPE(target->tag, TAG_TYPE_CONS))
@@ -441,7 +470,7 @@ void memory_free(Cell* target)
     }
     else if(IS_TYPE(target->tag, TAG_TYPE_STRING))
     {
-        free(target->car);
+        free(target->car); // logic for substrs pls
     }
 
     target->tag = TAG_MAGIC | TAG_TYPE_CONS;
@@ -524,7 +553,17 @@ int memory_sweep()
         {
             // Out
             if(IS_TYPE(this_cell->tag, TAG_TYPE_STRING))
+            {
+                // Good a place as any to put this. Substrings should be copies.
+                // You tried to make them first-class objects and realized it had
+                // garbage collection obligations you couldn't meet.
                 free(this_cell->car);
+            }
+            else if(IS_TYPE(this_cell->tag, TAG_TYPE_STREAM))
+            {
+                // Try to close an open FILE*.
+                fclose((FILE*)this_cell->car);
+            }
 
             this_cell->car = NULL;
             this_cell->cdr = NULL;

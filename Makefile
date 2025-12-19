@@ -14,7 +14,7 @@ fast:
 	gcc -O3 $(CFLAGS) -o thanks $(SRCFILES) $(LDFLAGS)
 
 webrun:
-	emcc -DUSE_SHIM -O0 -g $(SRCFILES) shim.c -o web/test.mjs -s FORCE_FILESYSTEM -s ASYNCIFY --js-library=web/emscripten-pty.js
+	emcc -DUSE_SHIM -DON_WEB -O0 -g $(SRCFILES) shim.c -o web/test.mjs -s FORCE_FILESYSTEM -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=32768  -s EXPORTED_RUNTIME_METHODS=FS --js-library=web/emscripten-pty.js --preload-file examples
 
 test: thanks
 	@echo "Diffs reported:"

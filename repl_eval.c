@@ -318,7 +318,7 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
         {
             // An oversight? Builtins don't get a lexical environment automatically, unless they do it themselves.
             Cell* result = ((Cell* (*)(Cell*))func->car)(args);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY) && argc > 0) { frame_pop_in(&temp_root, 1); } //argc); }
             return result;
         }
         else if(IS_TYPE(func->tag, TAG_TYPE_LAMBDA))
@@ -331,7 +331,7 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
             {
                 // The lambda list was invalid for some reason.
                 frame_pop(expected);
-                if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); }//argc); }
+                if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY) && argc > 0) { frame_pop_in(&temp_root, 1); }//argc); }
                 return built_list_ref;
             }
 
@@ -370,13 +370,13 @@ Cell* _evaluate_sexp_macrocontrol(Cell* target, bool eval_macro_result, bool fin
 
             // Unwind the lexical environment.
             frame_pop(expected);
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); } //argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY) && argc > 0) { frame_pop_in(&temp_root, 1); } //argc); }
 
             return result;
         }
         else
         {
-            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY)) { frame_pop_in(&temp_root, 1); }//argc); }
+            if(!IS_SPEC(func->tag, TAG_SPEC_FUNLAZY) && argc > 0) { frame_pop_in(&temp_root, 1); }//argc); }
             return memory_alloc_exception(TAG_SPEC_EX_TYPE, memory_alloc_string("eval: not a function", -1));
         }
     }

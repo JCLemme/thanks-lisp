@@ -128,6 +128,8 @@ char* string_ptr(Cell* str);
 bool symbol_is_keyword(Cell* sym);
 bool symbol_matches(Cell* sym, char* name);
 
+bool is_form_of(Cell* target, char* name);
+
 // ---
 
 void memory_free(Cell* target);

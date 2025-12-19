@@ -17,6 +17,10 @@
 #  define D(x)
 #endif
 
+#ifdef ON_WEB
+#include <emscripten.h>
+#endif
+
 #if defined(USE_READLINE)
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -543,7 +547,8 @@ Cell* fn_tagbody(Cell* args)
 {
     Cell* hunting_for = NULL;
     Cell* current_step = args;
-    
+    //frame_push_in(&temp_root, current_step);
+
     // TODO: needs a cache so bad
     
     while(!IS_NIL(current_step))
@@ -573,6 +578,7 @@ Cell* fn_tagbody(Cell* args)
                     }
                     else
                     {
+                        //frame_pop_in(&temp_root, 1);
                         return result; 
                     }
                 }
@@ -592,10 +598,12 @@ Cell* fn_tagbody(Cell* args)
 
     if(hunting_for != NULL)
     {
+        //frame_pop_in(&temp_root, 1);
         return memory_alloc_exception(TAG_SPEC_EX_DATA, memory_alloc_string("tagbody: label not found", -1));
     }
     else
     {
+        //frame_pop_in(&temp_root, 1);
         return NIL;
     }
 }
@@ -712,7 +720,7 @@ Cell* fn_pyprint(Cell* args)
 
         if(IS_TYPE(next->tag, TAG_TYPE_PSTRING))
         {
-            printf("%s", (char*)&(next->car));
+            printf("%s", (char*)&(next->data));
         }
         else if(IS_TYPE(next->tag, TAG_TYPE_STRING))
         {
@@ -833,11 +841,11 @@ Cell* fn_pyprint_to(Cell* args)
 
         if(IS_TYPE(next->tag, TAG_TYPE_PSTRING))
         {
-            fprintf(file, "%s", (char*)&(next->car));
+            fprintf(file, "%s", string_ptr(next));
         }
         else if(IS_TYPE(next->tag, TAG_TYPE_STRING))
         {
-            fprintf(file, "%s", (char*)next->car);
+            fprintf(file, "%s", string_ptr(next));
         }
         else
         {
@@ -993,7 +1001,11 @@ Cell* fn_fast(Cell* args)
 Cell* fn_sleep(Cell* args)
 {
     Cell* sec = args->car;
+#ifdef ON_WEB
+    emscripten_sleep(sec->num * 1000);
+#else
     sleep(sec->num);
+#endif
     return sec;
 }
 
@@ -1017,6 +1029,71 @@ Cell* fn_decoded_time(Cell* args)
 
     return saved;
 }
+
+Cell* fn_load(Cell* args)
+{
+    Cell* filename = args->car;
+    int len;
+    FILE* target = fopen(string_ptr(filename), "r");
+
+    fseek(target, 0, SEEK_END);
+    len = ftell(target);
+    fseek(target, 0, SEEK_SET);
+    char* buffer = malloc(len);
+    
+    if(buffer)
+    {
+        fread(buffer, 1, len, target);
+        fclose(target);
+    }
+    else
+    {
+        fclose(target);
+        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("load: error opening file", -1));
+    }
+
+    int idx = 0;
+    Cell* last = NIL;
+
+    while(idx <= len && last != NULL)
+    {
+        Cell* next = _walk_sexps(buffer, &idx);
+        if(next == NULL) { return last; }
+        frame_push_in(&temp_root, next);
+        last = _evaluate_sexp(next);
+        frame_pop_in(&temp_root, 1);
+        if(IS_TYPE(last->tag, TAG_TYPE_EXCEPTION)) { return last; }
+    }
+
+    return last;
+}
+
+Cell* fn_symbol_name(Cell* args)
+{
+    // We don't want the user fucking with the symbol table.
+    return memory_single_copy(((Cell*)args->car)->car);
+}
+
+Cell* fn_read_from_string(Cell* args)
+{
+    return _parse_sexps(string_ptr(args->car)); 
+}
+
+Cell* fn_substr(Cell* args)
+{
+    Cell* str = memory_nth(args, 0)->car;
+    Cell* cstart = memory_nth(args, 1)->car;
+    Cell* clen = memory_nth(args, 2)->car;
+    
+    int start = cstart->num;
+    int len = (IS_NIL(clen)) ? -1 : clen->num;
+
+    if(start >= str->size || len > str->size || (start+len) > str->size) 
+        return memory_alloc_exception(TAG_SPEC_EX_VALUE, memory_alloc_string("substr: invalid start/len", -1));
+
+    return memory_alloc_string(string_ptr(str) + start, len);
+}
+
 
 // -- -- -- -- --
 
@@ -1107,7 +1184,11 @@ int main(int argc, char** argv)
     frame_push_defn_in(&env_root, "fast", memory_alloc_builtin(fn_fast, 0));
     frame_push_defn_in(&env_root, "sleep", memory_alloc_builtin(fn_sleep, 0));
     frame_push_defn_in(&env_root, "decoded-time", memory_alloc_builtin(fn_decoded_time, 0));
-
+    frame_push_defn_in(&env_root, "load", memory_alloc_builtin(fn_load, 0));
+    frame_push_defn_in(&env_root, "symbol-name", memory_alloc_builtin(fn_symbol_name, 0));
+    frame_push_defn_in(&env_root, "read-from-string", memory_alloc_builtin(fn_read_from_string, 0));
+    frame_push_defn_in(&env_root, "substr", memory_alloc_builtin(fn_substr, 0));
+    
     frame_push_defn_in(&env_root, "*error-stream*", memory_alloc_stream(stderr));
     frame_push_defn_in(&env_root, "*reader-macros*", &reader_macros);
     // env-root should be a variable too, but printing it causes an infinite loop, so.
@@ -1125,6 +1206,8 @@ int main(int argc, char** argv)
     // Fun wrappers around primitive conditionals and loops.
     _evaluate_sexp(_parse_sexps("(def if (macro (cd ys no) `(cond (,cd ,ys) (t ,no)) ))"));
     _evaluate_sexp(_parse_sexps("(def dotimes (macro (ct bd) `(let ((i 0)) (tagbody g_loop ,bd (setq i (+ i 1)) (cond ((< i ,ct) (go g_loop))))) ))"));
+    _evaluate_sexp(_parse_sexps("(def let-dotimes (macro (cv ct bd) `(let ((,cv 0)) (tagbody g_loop ,bd (setq ,cv (+ ,cv 1)) (cond ((< ,cv ,ct) (go g_loop))))) ))"));
+    _evaluate_sexp(_parse_sexps("(def while (macro (cd bd) `(tagbody g_loop ,bd (cond (,cd (go g_loop))))))"));
 
     // Helper shims for benchmarks - might make it into the standard library, might not.
     _evaluate_sexp(_parse_sexps("(def plusp (lambda (qu) (> qu 0)))"));
