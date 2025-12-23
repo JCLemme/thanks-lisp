@@ -1,0 +1,94 @@
+Thanks lisp v2
+Now speaking to the lisp listener.
+* (+ 1 2 3 4)[C[C[C[C[C[C[C[C[C[C[C[C[C
+10
+* (- (* 2 3)[C[C[C[C[C[C[C[C[C[C[C[C (/ 1 (+ 2 7)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+5.888889
+* (def hehe 1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+hehe
+* hehe
+1
+* (def dubb (lambda (a)[C[C[C (+ a a)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+dubb
+* (dubb 4)[C[C[C[C[C[C[C[C[C[C
+8
+* hehe
+1
+* (hehe)[C[C[C[C[C[C[C[C
+Exception (type 3) in eval: '1' not a function
+* (+ "1" 2)[C[C[C[C[C[C[C[C[C[C[C
+Exception (type 3) in add: not a numberc
+* (tak 18 12 6)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+7
+* (ttak 18 12 6)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+7
+* (append '(1 2 3)[C[C[C[C[C[C[C '(4 5 6)[C[C[C[C[C[C[C 7)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+(1 2 3 4 5 6 . 7)
+* (pyprint '(1 2 3)[C[C[C[C[C[C[C " is a list with car " (car '(1 2 3)[C[C[C[C[C[C[C) " and cdr " (cdr '(1 2 3)[C[C[C[C[C[C[C)) [A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[K)
+(1 2 3)  is a list with car  7 1  and cdr  (2 3) 
+()
+* (dotimes 10 (print i)[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+()
+* i
+Exception (type 3) in eval: symbol 'i' undefined
+* j
+Exception (type 3) in eval: symbol 'j' undefined
+* (let ((i 10)[C[C[C[C[C[C (j 2)[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (pyprint j i)[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+2 10 
+()
+* i
+Exception (type 3) in eval: symbol 'i' undefined
+* j
+Exception (type 3) in eval: symbol 'j' undefined
+* (garbage)[C[C[C[C[C[C[C[C[C[C[C
+966
+* (def A (lambda (k x1 x2 x3 x4 x5)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (nlet ((B (lambda ()[C[C (progn (setq k (- k 1)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (A k B x1 x2 x3 x4)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C )[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (if (<= k 0)[C[C[C[C[C[C[C[C (+ (x4)[C[C[C[C (x5)[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C (B)[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C[C[C[C[C[C[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C)[A[C[C
+[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+A
+* (A 10 (lambda ()[C[C 1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C -1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C -1)[C[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C 1)[C[C[C[C[C[C[C[C[C[C[C[C[C (lambda ()[C[C 0)[C[C[C[C[C[C[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+-67
+* (garbage)[C[C[C[C[C[C[C[C[C[C[C
+1060
+* (+
+Exception (type 5) in read: malformed sexpsio
+* )))))
+Exception (type 5) in read: malformed sexpsfi
+* (" e32k 23k00k 3k 23k23
+Exception (type 5) in read: malformed sexps7
+*  3"
+Exception (type 3) in eval: symbol '3"' undefined
+*  23
+23
+* 
+* (- 9)[C[C[C[C[C[C[C
+-9
+* (def nooo '(0 2 3)[C[C[C[C[C[C[C)
+nooo
+* (nconc nooo '(22 22)[C[C[C[C[C[C[C 8)
+(0 2 3 22 22 . 8)
+* nooo
+(0 2 3 22 22 . 8)
+* (type-of '(cons 1 2)[C[C[C[C[C[C[C[C[C[C)
+:cons
+* `(1 2 3 4 ,(+ 1 1)[C[C[C[C[C[C[C)[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C
+(1 2 3 4 2)
+* 
+* 
+main: used 1206/409600 cells (0%)

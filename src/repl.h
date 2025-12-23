@@ -8,7 +8,6 @@
 
 #include "memory.h"
 #include "frame.h"
-#include "util.h"
 
 #ifndef _REPL_H
 #define _REPL_H

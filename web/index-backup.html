@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@xterm/xterm/css/xterm.css"
+    />
+    <meta charset="UTF-8">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/media/favicon-16x16.png">
+
+    <link rel="icon" type="image/png" sizes="48x48" href="/media/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/media/favicon-192x192.png">
+
+    <link rel="apple-touch-icon" type="image/png" sizes="167x167" href="/media/favicon-167x167.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/media/favicon-180x180.png">
+
+    <style>
+    @font-face {
+      font-family: "LispM";
+      src: url("LispM-Monospace.woff") format('woff');
+    }
+    </style>
+</head>
+
+<body style="cursor: nw-resize; font-family: LispM, sans-serif; font-size: 13px;">
+
+    <div style="max-width: 640px; margin-left: auto; margin-right: auto; border: 2px solid black; ">
+        <div style="border-bottom: 2px solid black; padding: 10px;"><span style="font-style: italic">Console 1: (thanks)</span></div>
+        <div id="terminal" style="padding: 10px; scrollbar-color: white lightgrey;"></div>
+    </div>
+
+    <div style="margin-top: 20px; max-width: 640px; margin-left: auto; margin-right: auto; border: 2px solid black; ">
+        <div style="border-bottom: 2px solid black; padding: 10px;"><span style="font-style: italic">Document Examiner</span></div>
+        <div id="terminal" style="padding: 10px; scrollbar-color: white lightgrey;">
+            <p><span style="font-weight: bold">What's this?</span></p>
+            <p>It's my baby Lisp interpreter, compiled to WebAssembly and running in your browser.</p>
+            <p>I had fun with the CSS if <a href="https://bitsavers.org/pdf/mit/cadr/CADR_brochure1.jpg">you couldn't tell</a></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import "https://unpkg.com/@xterm/xterm/lib/xterm.js";
+        import "https://cdn.jsdelivr.net/npm/xterm-addon-fit"
+        import { openpty } from "./index.mjs";
+        import initEmscripten from "./test.mjs";
+
+        var xterm = new Terminal({ fontFamily: 'LispM, monospaced', fontSize: 13, cols: 132, rows: 48, theme: {foreground: "black", background: "white", cursor: "black", selectionForeground: "white", selectionBackground: "black"} });
+        xterm.open(document.getElementById("terminal"));
+
+        const fitAddon = new FitAddon.FitAddon();
+        xterm.loadAddon(fitAddon);
+        fitAddon.fit()
+
+        const { master, slave } = openpty();
+
+        xterm.loadAddon(master);
+
+        await initEmscripten({ pty: slave });
+    </script>
+</body>
+</html>
+
+

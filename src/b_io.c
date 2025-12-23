@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "builtins.h"
 #include "frame.h"
 #include "repl.h"
 
@@ -6,6 +7,9 @@
  * Math related
  */
 
+#ifdef ON_WEB
+#include <emscripten.h>
+#endif
 char* thanks_gets(char*);
 
 Cell* fn_collect(Cell* args) // (collect) Prompts the user for a string
@@ -16,7 +20,7 @@ Cell* fn_collect(Cell* args) // (collect) Prompts the user for a string
     return made;
 }
 
-Cell* fn_pyprint(Cell* args)
+Cell* fn_pyprint(Cell* args) // (pyprint &rest v) Successively prints its arguments v, with no quotes around strings and spaces between values
 {
     while(!IS_NIL(args))
     {
@@ -43,7 +47,7 @@ Cell* fn_pyprint(Cell* args)
     return NIL;
 }
 
-Cell* fn_open(Cell* args)
+Cell* fn_open(Cell* args) // (open f m) Opens filename f with mode m and returns a stream
 {
     Cell* filename = memory_nth(args, 0)->car;
     Cell* mode = memory_nth(args, 1)->car;
@@ -56,7 +60,7 @@ Cell* fn_open(Cell* args)
     return memory_alloc_stream((void*)file);
 }
 
-Cell* fn_close(Cell* args)
+Cell* fn_close(Cell* args) // (close s) Closes a stream s
 {
     Cell* stream = args->car;
     fclose(stream->car);
@@ -64,12 +68,12 @@ Cell* fn_close(Cell* args)
     return NIL;
 }
 
-Cell* fn_stderr(Cell* args)
+Cell* fn_stderr(Cell* args) 
 {
     return memory_alloc_stream((void*)stderr);
 }
 
-Cell* fn_print_to(Cell* args)
+Cell* fn_print_to(Cell* args) // (print-to s f) Prints a form f to stream s
 {
     Cell* stream = memory_nth(args, 0)->car;
     Cell* target = memory_nth(args, 1)->car;
@@ -80,7 +84,7 @@ Cell* fn_print_to(Cell* args)
     return target; 
 }
 
-Cell* fn_pyprint_to(Cell* args)
+Cell* fn_pyprint_to(Cell* args) // (pyprint-to s &rest v) Like (pyprint), but prints to stream s
 {
     Cell* stream = args->car;
     args = args->cdr;
@@ -112,8 +116,9 @@ Cell* fn_pyprint_to(Cell* args)
     return NIL;
 }
 
-Cell* fn_time(Cell* args) // !
+Cell* fn_time(Cell* args) // !(time f) Evaluates form f, printing the elapsed evaluation time to the console
 {
+    // TODO: utility of making the time available to lisp?
     clock_t start = clock();
     Cell* result = _evaluate_sexp(args->car);
     clock_t stop = clock() - start;
@@ -121,18 +126,18 @@ Cell* fn_time(Cell* args) // !
     printf("time: %fms\n", len);
     return result;
 }
-Cell* fn_sleep(Cell* args)
+Cell* fn_sleep(Cell* args) // (sleep s) Pauses Lisp execution for s seconds
 {
     Cell* sec = args->car;
 #ifdef ON_WEB
-    emscripten_sleep(sec->num * 1000);
+    emscripten_sleep(sec->num * 1000.0);
 #else
-    sleep(sec->num);
+    usleep(sec->num * 1000.0 * 1000.0);
 #endif
     return sec;
 }
 
-Cell* fn_decoded_time(Cell* args)
+Cell* fn_decoded_time(Cell* args) // (decoded-time) Returns a list containing the system local time (s m h d m y w)
 {
     time_t rawtime;
     struct tm * timeinfo;
@@ -152,7 +157,7 @@ Cell* fn_decoded_time(Cell* args)
 
     return saved;
 }
-Cell* fn_load(Cell* args)
+Cell* fn_load(Cell* args) // (load f) Opens, reads, and evaluates the contents of filename f; returns the last result
 {
     Cell* filename = args->car;
     int len;

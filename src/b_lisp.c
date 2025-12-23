@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "frame.h"
+#include "builtins.h"
 #include "repl.h"
 
 /* Lisp operations
@@ -105,7 +106,7 @@ Cell* fn_append(Cell* args) // (append
     return save;
 }
 
-Cell* fn_rplaca(Cell* args)
+Cell* fn_rplaca(Cell* args) // (rplaca c a) Replaces the car of cons c with a
 {
     Cell* target = memory_nth(args, 0)->car;
     Cell* insert = memory_nth(args, 1)->car;
@@ -113,7 +114,7 @@ Cell* fn_rplaca(Cell* args)
     return target;
 }
 
-Cell* fn_rplacd(Cell* args)
+Cell* fn_rplacd(Cell* args) // (rplacd c d) Replaces the cdr of cons c with d
 {
     Cell* target = memory_nth(args, 0)->car;
     Cell* insert = memory_nth(args, 1)->car;
@@ -121,7 +122,7 @@ Cell* fn_rplacd(Cell* args)
     return target;
 }
 
-Cell* fn_nconc(Cell* args)
+Cell* fn_nconc(Cell* args) // (nconc &rest l) Destructively concatenates all lists l, replacing the cdr of each list's last element in-place
 {
     // Trying something different.
     // (Bad)
@@ -142,7 +143,7 @@ Cell* fn_nconc(Cell* args)
     return save;
 }
 
-Cell* fn_null(Cell* args)
+Cell* fn_null(Cell* args) // (null c) Returns t if the cell is nil
 {
     // TODO: nearly time to flip case
     if(args == NULL || args == NIL) { return T; }
@@ -150,7 +151,7 @@ Cell* fn_null(Cell* args)
 }
 
 
-Cell* fn_lambda(Cell* args) // !
+Cell* fn_lambda(Cell* args) // !(lambda l b) Constructs a lambda function with lambda-list l and body b
 {
     // Args: a list of arguments, and a list of operations
     Cell* arglist = args->car;
@@ -165,7 +166,7 @@ Cell* fn_lambda(Cell* args) // !
     return result;
 }
 
-Cell* fn_macro(Cell* args) // !
+Cell* fn_macro(Cell* args) // !(macro l b) Constructs a macro with lambda-list l and body b
 {
     // Args: a list of arguments, and a list of operations
     Cell* arglist = args->car;
@@ -176,12 +177,12 @@ Cell* fn_macro(Cell* args) // !
 
 
 
-Cell* fn_read(Cell* args)
+Cell* fn_read(Cell* args) // (read s) BORKED Parses an s-expression from a string s
 {
     return _parse_sexps(string_ptr(args->car));
 }
 
-Cell* fn_print(Cell* args)
+Cell* fn_print(Cell* args) // (print v) Prints an s-expression v to the console
 {
     Cell* arg = args->car;
     _print_sexps(arg);
@@ -189,12 +190,12 @@ Cell* fn_print(Cell* args)
     return arg;
 }
 
-Cell* fn_eval(Cell* args) 
+Cell* fn_eval(Cell* args) // (eval v) Evaluates an s-expression v and returns the result
 {
     return _evaluate_sexp(args->car);
 }
 
-Cell* fn_eq(Cell* args)
+Cell* fn_eq(Cell* args) // (eq a b) Returns true if cells a and b have the same car, i.e. refer to the same object
 {
     // Semantics - in CL, "eq" is a pointer comparison - is this the same object?
     Cell* a = memory_nth(args, 0);
@@ -202,14 +203,14 @@ Cell* fn_eq(Cell* args)
     return (a->car == b->car) ? T : NIL;
 }
 
-Cell* fn_eql(Cell* args)
+Cell* fn_eql(Cell* args) // (eql a b) Returns true if the cars of cells a and b have the same value
 {
     // However, "eql" is a value comparison - do these objects mean the same thing?
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
     return (a->data == b->data) ? T : NIL;
 }
-Cell* fn_cond(Cell* args) // !
+Cell* fn_cond(Cell* args) // !(cond &rest c) Evaluates a set of test-body pairs c, returning the result of the first match
 {
     while(!IS_NIL(args))
     {
@@ -231,7 +232,7 @@ Cell* fn_cond(Cell* args) // !
     return NIL;
 }
 
-Cell* fn_go(Cell* args) // !
+Cell* fn_go(Cell* args) // !(go l) Changes the control flow in a tagbody to the label l
 {
     Cell* target = args->car;
     if(!IS_TYPE(target->tag, TAG_TYPE_SYMBOL)) 
@@ -244,7 +245,7 @@ Cell* fn_go(Cell* args) // !
     }
 }
 
-Cell* fn_tagbody(Cell* args) // !
+Cell* fn_tagbody(Cell* args) // !(tagbody &rest s) Evaluates its arguments s in order, optionally changing control flow with the use of (go)
 {
     Cell* hunting_for = NULL;
     Cell* current_step = args;
@@ -309,7 +310,7 @@ Cell* fn_tagbody(Cell* args) // !
     }
 }
 
-Cell* fn_setq(Cell* args) // !
+Cell* fn_setq(Cell* args) // !(setq n v) Sets the value of symbol s in the environment to value v
 {
     Cell* sym = memory_nth(args, 0)->car;
     Cell* newval = memory_nth(args, 1)->car;
@@ -339,7 +340,7 @@ Cell* fn_setq(Cell* args) // !
     }
 }
 
-Cell* fn_let(Cell* args) // !
+Cell* fn_let(Cell* args) // !(let a f) Locally defines a list of name-value pairs a, then evaluates form f
 {
     Cell* variables = memory_nth(args, 0)->car;
     Cell* form = memory_nth(args, 1)->car;
@@ -369,7 +370,7 @@ Cell* fn_let(Cell* args) // !
     return result;
 }
 
-Cell* fn_nlet(Cell* args) // !
+Cell* fn_nlet(Cell* args) // !(nlet a f) BORKED Like (let) but allows referencing names within their own definitions
 {
     Cell* variables = memory_nth(args, 0)->car;
     Cell* form = memory_nth(args, 1)->car;
@@ -402,18 +403,19 @@ Cell* fn_nlet(Cell* args) // !
     return result;
 }
 
-Cell* fn_macroexpand(Cell* args)
+Cell* fn_macroexpand(Cell* args) // (macroexpand m) Expands a macro form m to its most primitive version
 {
     return _macroexpand(args->car);
 }
-Cell* fn_progn(Cell* args)
+
+Cell* fn_progn(Cell* args) // (progn &rest f) Processes its arguments f in order, returning the result of the last
 {
     // Our (eval) executes these statements in order anyway - just return the last argument.
     if(args == NULL || args == NIL) { return NIL; }
     return memory_nth(args, memory_length(args) - 1)->car;
 }
 
-Cell* fn_and(Cell* args)
+Cell* fn_and(Cell* args) // (and &rest t) Returns true if all its arguments t are truthy
 {
     Cell* last = T;
 
@@ -427,7 +429,7 @@ Cell* fn_and(Cell* args)
     return last;
 }
 
-Cell* fn_or(Cell* args)
+Cell* fn_or(Cell* args) // (or &rest t) Returns true if any of its arguments t are truthy
 {
     while(!IS_NIL(args))
     {
@@ -438,7 +440,7 @@ Cell* fn_or(Cell* args)
     return NIL;
 }
 
-Cell* fn_when(Cell* args) // !
+Cell* fn_when(Cell* args) // !(when t b) Evaluates a test form t, and evaluates body b if the result is true
 {
     // This can be a macro once I implement &rest in lambda-lists
     Cell* condition = args->car;
@@ -459,7 +461,7 @@ Cell* fn_when(Cell* args) // !
     return last;
 }
 
-Cell* fn_map(Cell* args)
+Cell* fn_map(Cell* args) // (map f l) Applies a function f to the cars of list l, returning a list of the results
 {
     Cell* func = memory_nth(args, 0)->car;
     Cell* data = memory_nth(args, 1)->car;
@@ -485,7 +487,7 @@ Cell* fn_map(Cell* args)
     return results;
 }
 
-Cell* fn_typep(Cell* args)
+Cell* fn_typep(Cell* args) // (typep t c) Returns true if the type of cell c matches type keyword t
 {
     Cell* type = memory_nth(args, 0)->car;
     Cell* target = memory_nth(args, 1)->car;
@@ -503,7 +505,7 @@ Cell* fn_typep(Cell* args)
     else { return NIL; }
 }
 
-Cell* fn_type_of(Cell* args)
+Cell* fn_type_of(Cell* args) // (type-of c) Returns the type keyword of cell c
 {
     Cell* target = memory_nth(args, 0)->car;
 
@@ -562,13 +564,13 @@ Cell* _do_backquote(Cell* target)
     }
 }
 
-Cell* fn_backquote(Cell* args) // !
+Cell* fn_backquote(Cell* args) // !(backquote f) Returns form f as-is, like quote; however, forms can be selectively evaluated within
 {
     // Opposite-eval: return quoted forms *except* when asked not to.
     return _do_backquote(args->car);
 }
 
-Cell* fn_comma(Cell* args)
+Cell* fn_comma(Cell* args) // (comma f) Evaluates and returns the result of form f; will evaulate even within a backquote form
 {
     // Do nothing.
     return args->car;

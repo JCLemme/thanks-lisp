@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
+#include <time.h>
+#include <unistd.h>
+#include <signal.h>
+
 
 #include "memory.h"
 #include "frame.h"
@@ -17,6 +21,7 @@
 void _evaldef(char* code);
 void _define_lisp();
 void _define_c();
+void _define_auto();
 void builtins_init();
 
 #endif

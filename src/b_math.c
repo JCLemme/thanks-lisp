@@ -152,35 +152,35 @@ Cell* fn_truncate(Cell* args) // (truncate n) Returns the integer part of a numb
 
     return memory_alloc_number(trunc(num->num));
 }
-Cell* fn_gt(Cell* args)
+Cell* fn_gt(Cell* args) // (> a b) Returns true if number a is greater than number b
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
     return (a->num > b->num) ? T : NIL;
 }
 
-Cell* fn_gteq(Cell* args)
+Cell* fn_gteq(Cell* args) // (>= a b) Returns true if number a is greater than or equal to number b
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
     return (a->num >= b->num) ? T : NIL;
 }
 
-Cell* fn_lt(Cell* args)
+Cell* fn_lt(Cell* args) // (< a b) Returns true if number a is less than number b
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
     return (a->num < b->num) ? T : NIL;
 }
 
-Cell* fn_lteq(Cell* args)
+Cell* fn_lteq(Cell* args) // (<= a b) Returns true if number a is less than or equal to number b
 {
     Cell* a = memory_nth(args, 0)->car;
     Cell* b = memory_nth(args, 1)->car;
     return (a->num <= b->num) ? T : NIL;
 }
 
-Cell* fn_numeq(Cell* args)
+Cell* fn_numeq(Cell* args) // (== a b) Returns true if numbers a and b are equal
 {
     // These are here for compat with CL.
     Cell* a = memory_nth(args, 0)->car;
@@ -188,7 +188,7 @@ Cell* fn_numeq(Cell* args)
     return (a->num == b->num) ? T : NIL;
 }
 
-Cell* fn_numneq(Cell* args)
+Cell* fn_numneq(Cell* args) // (!= a b) Returns true if numbers a and b are inequal
 {
     // I mean I guess they could point to the same builtin but 
     Cell* a = memory_nth(args, 0)->car;
