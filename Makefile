@@ -22,7 +22,7 @@ fast:
 	gcc -O3 $(CFLAGS) -o thanks $(SRCFILES) $(LDFLAGS)
 
 webrun:
-	emcc -DUSE_SHIM -DON_WEB -O0 -g $(SRCFILES) src/shim.c -o web/thanks.mjs -s FORCE_FILESYSTEM -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=32768 -s EXPORTED_FUNCTIONS=_main,_inthandler -s EXPORTED_RUNTIME_METHODS=["FS"] --js-library=web/emscripten-pty.js --embed-file examples
+	emcc -DUSE_SHIM -DON_WEB -O0 -g $(SRCFILES) src/shim.c -o web/thanks.mjs -s FORCE_FILESYSTEM -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=32768 -s EXPORTED_FUNCTIONS=_main,_inthandler -s EXPORTED_RUNTIME_METHODS=["FS"] --js-library=web/emscripten-pty.js --preload-file examples
 
 test: thanks
 	@echo "Diffs reported:"
