@@ -8,6 +8,7 @@
  */
 
 #ifdef ON_WEB
+#include <errno.h>
 #include <emscripten.h>
 #endif
 char* thanks_gets(char*);
@@ -53,6 +54,7 @@ Cell* fn_open(Cell* args) // (open f m) Opens filename f with mode m and returns
     Cell* mode = memory_nth(args, 1)->car;
     
     // pain
+    //printf("%s %s\n", string_ptr(filename), symbol_string_ptr(mode)+1);
     FILE* file = fopen(string_ptr(filename), symbol_string_ptr(mode)+1);
     if(file == NULL)
         return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("open: error opening file", -1));
@@ -160,13 +162,18 @@ Cell* fn_decoded_time(Cell* args) // (decoded-time) Returns a list containing th
 Cell* fn_load(Cell* args) // (load f) Opens, reads, and evaluates the contents of filename f; returns the last result
 {
     Cell* filename = args->car;
-    int len;
-    FILE* target = fopen(string_ptr(filename), "r");
+
+    FILE* target = NULL;
+
+    target = fopen(string_ptr(filename), "r");
+    if(!target)
+        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("load: error opening file", -1));
 
     fseek(target, 0, SEEK_END);
-    len = ftell(target);
+    int len = ftell(target);
     fseek(target, 0, SEEK_SET);
-    char* buffer = malloc(len);
+
+    char* buffer = calloc(len+2, 1);
     
     if(buffer)
     {
@@ -176,7 +183,7 @@ Cell* fn_load(Cell* args) // (load f) Opens, reads, and evaluates the contents o
     else
     {
         fclose(target);
-        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("load: error opening file", -1));
+        return memory_alloc_exception(TAG_SPEC_EX_IO, memory_alloc_string("load: error loading file", -1));
     }
 
     int idx = 0;
@@ -189,9 +196,14 @@ Cell* fn_load(Cell* args) // (load f) Opens, reads, and evaluates the contents o
         frame_push_in(&temp_root, next);
         last = _evaluate_sexp(next);
         frame_pop_in(&temp_root, 1);
-        if(IS_TYPE(last->tag, TAG_TYPE_EXCEPTION)) { return last; }
+        if(IS_TYPE(last->tag, TAG_TYPE_EXCEPTION)) 
+        {
+            free(buffer);
+            return last; 
+        }
     }
 
+    free(buffer);
     return last;
 }
 

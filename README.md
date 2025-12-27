@@ -2,6 +2,8 @@
 
 It occurred to me that I'm Old and I've never implemented a Lisp before[^1]. How embarassing
 
+![Doing math and such](web/demo.png)
+
 Well, off to fix that. Two days later and here is that Lisp. It's a mess (first time jitters) but yet:
 
 * Working lambdas

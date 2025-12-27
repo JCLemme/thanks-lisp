@@ -22,76 +22,189 @@
       font-family: "LispM";
       src: url("LispM-Monospace.woff") format('woff');
     }
+
+    :root {
+      --main-container-max-width: 1000px;
+      --canvas-size: 240px;
+      --border-width: 2px;
+      --gap: 20px;
+      --padding: 10px;
+    }
+
+    body {
+      cursor: nw-resize;
+      font-family: LispM, sans-serif;
+      font-size: 13px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .main-container {
+      display: flex;
+      max-width: var(--main-container-max-width);
+      margin: 20px auto;
+      gap: var(--gap);
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      border: var(--border-width) solid black;
+      box-shadow: 4px 4px lightgrey;
+    }
+
+    .panel-header {
+      border-bottom: var(--border-width) solid black;
+      padding: var(--padding);
+      font-style: italic;
+    }
+
+    .terminal-panel {
+      flex: 1;
+      min-width: 0; /* Allow flex shrinking */
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-content {
+      padding: var(--padding);
+      scrollbar-color: white lightgrey;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .graphics-panel {
+      flex-shrink: 0;
+    }
+
+    .graphics-content {
+      padding: var(--padding);
+    }
+
+    .graphics-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border: 1px solid #ccc;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Lock to 1x scale below 850px */
+    @media (max-width: 850px) {
+      .graphics-canvas {
+        width: var(--canvas-size) !important;
+        height: var(--canvas-size) !important;
+      }
+    }
+
+    /* Scale to fit on narrow screens */
+    @media (max-width: 768px) {
+      .graphics-canvas {
+        width: min(var(--canvas-size), calc(100vw - 40px)) !important;
+        height: min(var(--canvas-size), calc(100vw - 40px)) !important;
+      }
+    }
+
+    .document-examiner {
+      margin-top: 20px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+      border: var(--border-width) solid black;
+    }
+
+    .document-content {
+      padding: var(--padding);
+      scrollbar-color: white lightgrey;
+    }
+
+    /* Responsive layout for narrow screens */
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+        padding: 0 10px;
+      }
+
+      .graphics-panel {
+        order: -1; /* Show monitor first on mobile */
+      }
+
+      .terminal-panel {
+        /* Size to fit viewport, leaving room to peek at docs below */
+        max-height: calc(100vh - var(--canvas-size) - 150px);
+        min-height: 300px;
+      }
+
+      .document-examiner {
+        margin-left: 10px;
+        margin-right: 10px;
+      }
+    }
+
+    /* Very narrow screens */
+    @media (max-width: 480px) {
+      .main-container {
+        margin: 10px auto;
+        gap: 10px;
+      }
+    }
+
+    button {
+      font-family: LispM, sans-serif;
+      font-size: 13px;
+      background-color: white;
+      border: 2px solid black;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: black;
+      color: white;
+    }
     </style>
 </head>
 
-<body style="cursor: nw-resize; font-family: LispM, sans-serif; font-size: 13px;">
+<body>
 
-    <div style="display: flex; max-width: 1200px; margin: 20px auto; gap: 20px;">
+    <div class="main-container">
 
         <!-- Left: Terminal Panel -->
-        <div style="flex: 1; border: 2px solid black;">
-            <div style="border-bottom: 2px solid black; padding: 10px;"><span style="font-style: italic">Console 1: (thanks)</span></div>
-            <div id="terminal" style="padding: 10px; scrollbar-color: white lightgrey;"></div>
+        <div class="panel terminal-panel">
+            <div class="panel-header">Console 1: (thanks)</div>
+            <div id="terminal" class="terminal-content"></div>
         </div>
 
         <!-- Right: Graphics Panel -->
-        <div style="border: 2px solid black;">
-            <div style="border-bottom: 2px solid black; padding: 10px;"><span style="font-style: italic">Graphics Display</span></div>
-            <div style="padding: 10px;">
+        <div class="panel graphics-panel">
+            <div class="panel-header">Graphics Display</div>
+            <div class="graphics-content">
                 <canvas id="gfx-canvas"
+                        class="graphics-canvas"
                         width="240"
-                        height="240"
-                        style="image-rendering: pixelated;
-                               image-rendering: crisp-edges;
-                               border: 1px solid #ccc;
-                               display: block;">
+                        height="240">
                 </canvas>
             </div>
         </div>
 
     </div>
 
-    <div style="margin-top: 20px; max-width: 640px; margin-left: auto; margin-right: auto; border: 2px solid black; ">
-        <div style="border-bottom: 2px solid black; padding: 10px;"><span style="font-style: italic">Document Examiner</span></div>
-        <div style="padding: 10px; scrollbar-color: white lightgrey;">
-            <p><span style="font-weight: bold">What's this?</span></p>
+    <div class="panel document-examiner">
+        <div class="panel-header">Document Examiner</div>
+        <div class="document-content">
+            <h2>Hello, thanks lisp</h2>
+            <p><a href="https://github.com/jclemme/thanks-lisp">Source code</a>
+            <h2><span style="font-weight: bold">What's this?</span></h2>
             <p>It's my baby Lisp interpreter, compiled to WebAssembly and running in your browser.</p>
             <p>I had fun with the CSS if <a href="https://bitsavers.org/pdf/mit/cadr/CADR_brochure1.jpg">you couldn't tell</a></p>
+            <h2><span style="font-weight: bold">How about some demos</span></h2>
+            <button onclick="doPlot()">plot a function</button>
+            <button onclick="doClock()">an analog clock</button>
         </div>
     </div>
 
-    <script type="module">
-        import "https://unpkg.com/@xterm/xterm/lib/xterm.js";
-        import "https://cdn.jsdelivr.net/npm/xterm-addon-fit"
-        import { openpty } from "./index.mjs";
-        import initEmscripten from "./test.mjs";
-        import { GraphicsRenderer, setupVirtualPipe } from "./graphics.js";
-
-        var xterm = new Terminal({ fontFamily: 'LispM, monospaced', fontSize: 13, theme: {foreground: "black", background: "white", cursor: "black", selectionForeground: "white", selectionBackground: "black"} });
-        xterm.open(document.getElementById("terminal"));
-
-        const fitAddon = new FitAddon.FitAddon();
-        xterm.loadAddon(fitAddon);
-        fitAddon.fit()
-
-        const { master, slave } = openpty();
-
-        xterm.loadAddon(master);
-
-        // Initialize graphics BEFORE Emscripten
-        const canvas = document.getElementById('gfx-canvas');
-        const gfxRenderer = new GraphicsRenderer(canvas);
-
-        // Initialize Emscripten with PTY
-        const Module = await initEmscripten({ pty: slave });
-
-        // Setup virtual pipe AFTER Module is ready
-        setupVirtualPipe(Module, gfxRenderer);
-
-        console.log('[GFX] Graphics system initialized');
-        console.log('[GFX] Write to /tmp/gfx_pipe from Lisp to draw');
-    </script>
+    <script type="module" src="./term.js"></script>
 </body>
 </html>
 

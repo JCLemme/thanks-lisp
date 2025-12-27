@@ -6,7 +6,7 @@
 #  define D(x)
 #endif
 
-// to ken
+// to don
 static Cell* mem = NULL;
 static int num_cells = 0;
 
@@ -110,7 +110,7 @@ Cell* memory_single_copy(Cell* src)
     {
         // TODO: probably a better way to effect this
         int len = strlen(src->car);
-        newc->car = malloc(len + 2);
+        newc->car = calloc(len + 2, 1);
         strncpy(newc->car, src->car, len);
         newc->size = src->size;
     }
@@ -242,7 +242,7 @@ void memory_build_string(Cell* found, char* src, int len)
     {
         // TODO: write our own allocator to avoid the malloc
         // likely will combine with the vector allocator
-        found->car = malloc(len + 2);
+        found->car = calloc(len + 2, 1);
         strncpy(found->car, src, len);
         found->tag = OF_TYPE(found->tag, TAG_TYPE_STRING);
         D(printf("memory: built string '%s' at addr %08x in cell %08x\n", found->car, found->car, found));

@@ -119,15 +119,15 @@ void inthandler(int sig)
 #ifdef USE_READLINE
         write_history(HIST_FILE);
 #endif
+#ifndef ON_WEB
         exit(0);
+#endif
     }
 }
 
 #define CELL_AREA 409600
 
 static char errorzone[256];
-
-
 
 
 
@@ -188,9 +188,7 @@ int main(int argc, char** argv)
     while(1)
     {
         got_interrupt = false;
-#ifdef USE_READLINE
         executing = false;
-#endif
 
         char* line_to_do = thanks_gets("* ");
         
@@ -203,9 +201,7 @@ int main(int argc, char** argv)
 
             D(printf("---\n"));
 
-#ifdef USE_READLINE
             executing = true;
-#endif
 
             Cell* res = _evaluate_sexp(cell_to_do);
             _print_sexps(res);
