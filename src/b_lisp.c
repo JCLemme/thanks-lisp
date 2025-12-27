@@ -67,7 +67,7 @@ Cell* fn_cons(Cell* args) // (cons a d) Constructs a cons cell with car a and cd
     return memory_alloc_cons(new_car, new_cdr);
 }
 
-Cell* fn_append(Cell* args) // (append 
+Cell* fn_append(Cell* args) // (append &rest l) Constructs a new list containing the elements of all lists l
 {
     // Trying something different.
     // (Bad)

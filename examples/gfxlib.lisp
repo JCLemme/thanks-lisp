@@ -1,3 +1,5 @@
+; A basic graphics library for the drawing terminal. And also a clock.
+
 (def *disp* (open "/tmp/gfx_pipe" :w))
 
 (def g-line (lambda (x1 y1 x2 y2) (pyprint-to *disp* "line" x1 y1 x2 y2)))
