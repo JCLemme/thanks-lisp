@@ -7,73 +7,138 @@ Lazy functions (that eval their own arguments) are prefixed with "!".
 
 ## In src/b_math.c:
 `(+ &rest n) Adds all numbers n`
+
 `(- n &rest s) Subtracts all numbers s from number n, or negates n if s is nil`
+
 `(* n &rest m) Multiplies number n by all numbers m, or returns n if m is nil`
+
 `(/ n &rest d) Divides number n by all numbers d`
+
 `(mod n d) Returns the remainder left after dividing number n by number d`
+
 `(sin a) Finds the sine of an angle a, in radians`
+
 `(cos a) Finds the cosine of an angle a, in radians`
+
 `(tan a) Finds the tangent of an angle a, in radians`
+
 `(sqrt n) Returns the square root of a number n`
+
 `(pow n p) Raises a number n to a power p`
+
 `(truncate n) Returns the integer part of a number n, rounding towards zero`
+
 `(> a b) Returns true if number a is greater than number b`
+
 `(>= a b) Returns true if number a is greater than or equal to number b`
+
 `(< a b) Returns true if number a is less than number b`
+
 `(<= a b) Returns true if number a is less than or equal to number b`
+
 `(== a b) Returns true if numbers a and b are equal`
+
 `(!= a b) Returns true if numbers a and b are inequal`
+
 
 ## In src/b_io.c:
 `(collect) Prompts the user for a string`
+
 `(pyprint &rest v) Successively prints its arguments v, with no quotes around strings and spaces between values`
+
 `(open f m) Opens filename f with mode m and returns a stream`
+
 `(close s) Closes a stream s`
+
 `(print-to s f) Prints a form f to stream s`
+
 `(pyprint-to s &rest v) Like (pyprint), but prints to stream s`
+
 `!(time f) Evaluates form f, printing the elapsed evaluation time to the console`
+
 `(sleep s) Pauses Lisp execution for s seconds`
+
 `(decoded-time) Returns a list containing the system local time (s m h d m y w)`
+
 `(load f) Opens, reads, and evaluates the contents of filename f; returns the last result`
+
 
 ## In src/b_lisp.c:
 `!(def n v) Adds or replaces a definition with name n and value v`
+
 `!(ldef n v) Of dubious utility`
+
 `(car c) Returns the car of cons c`
+
 `(cdr c) Returns the cdr of cons c`
+
 `(list &rest v) Constructs and returns a list from its arguments`
+
 `!(quote v) Returns its argument v literally, i.e. without being evaluated`
+
 `(cons a d) Constructs a cons cell with car a and cdr d`
+
 `(append &rest l) Constructs a new list containing the elements of all lists l`
+
 `(rplaca c a) Replaces the car of cons c with a`
+
 `(rplacd c d) Replaces the cdr of cons c with d`
+
 `(nconc &rest l) Destructively concatenates all lists l, replacing the cdr of each list's last element in-place`
+
 `(null c) Returns t if the cell is nil`
+
 `!(lambda l b) Constructs a lambda function with lambda-list l and body b`
+
 `!(macro l b) Constructs a macro with lambda-list l and body b`
+
 `(read s) BORKED Parses an s-expression from a string s`
+
 `(print v) Prints an s-expression v to the console`
+
 `(eval v) Evaluates an s-expression v and returns the result`
+
 `(eq a b) Returns true if cells a and b have the same car, i.e. refer to the same object`
+
 `(eql a b) Returns true if the cars of cells a and b have the same value`
+
 `!(cond &rest c) Evaluates a set of test-body pairs c, returning the result of the first match`
+
 `!(go l) Changes the control flow in a tagbody to the label l`
+
 `!(tagbody &rest s) Evaluates its arguments s in order, optionally changing control flow with the use of (go)`
+
 `!(setq n v) Sets the value of symbol s in the environment to value v`
+
 `!(let a f) Locally defines a list of name-value pairs a, then evaluates form f`
+
 `!(nlet a f) BORKED Like (let) but allows referencing names within their own definitions`
+
 `(macroexpand m) Expands a macro form m to its most primitive version`
+
 `(progn &rest f) Processes its arguments f in order, returning the result of the last`
+
 `(and &rest t) Returns true if all its arguments t are truthy`
+
 `(or &rest t) Returns true if any of its arguments t are truthy`
+
 `!(when t b) Evaluates a test form t, and evaluates body b if the result is true`
+
 `(map f l) Applies a function f to the cars of list l, returning a list of the results`
+
 `(typep t c) Returns true if the type of cell c matches type keyword t`
+
 `(type-of c) Returns the type keyword of cell c`
+
 `!(backquote f) Returns form f as-is, like quote; however, forms can be selectively evaluated within`
+
 `(comma f) Evaluates and returns the result of form f; will evaulate even within a backquote form`
+
 
 ## In src/b_string.c:
 `(symbol-name s) Returns a string containing the name of symbol s`
+
 `(read-from-string s) Reads and evaluates one s-expression from stream s`
+
 `(substr s i l) Copies and returns a substring from string s, from index i and with length l`
+
