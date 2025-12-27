@@ -1,7 +1,7 @@
 #!/bin/bash
 
 AUTOFILE=src/b_auto.c
-DOCFILE=reference.md
+DOCFILE=REFERENCE.md
 
 cat <<EOF > $AUTOFILE
 #include "builtins.h"
@@ -32,7 +32,7 @@ for sf in src/b_math.c src/b_io.c src/b_lisp.c src/b_string.c; do
 
         if [[ -n $name ]]; then
             echo "    $sign;" >> $AUTOFILE
-            echo "$docs" >> $DOCFILE
+            echo "\`$docs\`" >> $DOCFILE
 
             if [[ ! $(echo "$ds" | grep -e "!(") ]]; then
                 echo adding "$name" "($func)" 
